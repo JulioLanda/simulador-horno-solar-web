@@ -382,26 +382,13 @@ def drift_svg(state: WebTwinState) -> str:
 
 app_ui = ui.page_fluid(
     ui.tags.head(
-        ui.tags.script(
-            ui.HTML(
-                json.dumps(
-                    {
-                        "imports": {
-                            "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-                            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-                        }
-                    }
-                )
-            ),
-            type="importmap",
-        ),
-        ui.tags.script(src="twin3d.js", type="module"),
+        ui.tags.script(src="twin3d.js?v=0.2.1", type="module"),
     ),
     ui.include_css(APP_DIR / "www" / "styles.css"),
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.2"),
+            ui.h1("Mini horno solar · Web 0.2.1"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),

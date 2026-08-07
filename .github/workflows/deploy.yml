@@ -41,7 +41,9 @@ jobs:
           cp digital_twin/*.py build/digital_twin/
 
       - name: Exportar sitio estático
-        run: uv run --project web_app shinylive export build _site
+        run: |
+          uv run --project web_app shinylive export build _site
+          cp web_app/www/twin3d.js _site/twin3d.js
 
       - name: Subir sitio para GitHub Pages
         uses: actions/upload-pages-artifact@v3

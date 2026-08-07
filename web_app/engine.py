@@ -29,7 +29,7 @@ except ModuleNotFoundError:
 TAU = 2.0 * math.pi
 DEG = math.pi / 180.0
 RAD = 180.0 / math.pi
-WEB_APP_VERSION = "0.2.0"
+WEB_APP_VERSION = "0.2.1"
 
 
 MINIHORNO_WEB_PROFILE = {

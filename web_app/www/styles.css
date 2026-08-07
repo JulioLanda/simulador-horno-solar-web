@@ -1843,51 +1843,61 @@ a.secondary-action:focus {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 75% 22%, rgba(35, 86, 105, 0.24), transparent 29%),
-    linear-gradient(180deg, #0b1722, #0b1824);
+    radial-gradient(circle at 48% 24%, rgba(35, 86, 105, 0.3), transparent 34%),
+    linear-gradient(180deg, #0b1722 0%, #0c1b28 68%, #0a1520 100%);
 }
 
 .anatomy-scene::before {
   position: absolute;
-  right: -8%;
-  bottom: -34%;
-  left: -8%;
-  height: 66%;
+  right: -6%;
+  bottom: -31%;
+  left: -6%;
+  height: 62%;
   background-image:
-    linear-gradient(rgba(68, 111, 137, 0.55) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(68, 111, 137, 0.55) 1px, transparent 1px);
-  background-size: 34px 24px;
+    linear-gradient(rgba(63, 105, 130, 0.48) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 105, 130, 0.48) 1px, transparent 1px);
+  background-size: 42px 26px;
   content: "";
-  transform: perspective(170px) rotateX(57deg);
+  transform: perspective(190px) rotateX(59deg);
   transform-origin: center top;
 }
 
 .anatomy-sun {
   position: absolute;
-  z-index: 3;
-  top: 18%;
-  left: 17%;
-  width: 17px;
-  height: 17px;
+  z-index: 8;
+  top: 14%;
+  left: 22%;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff1a1;
   border-radius: 50%;
   background: #f4d35e;
-  box-shadow: 0 0 17px rgba(244, 211, 94, 0.7);
+  box-shadow: 0 0 18px rgba(244, 211, 94, 0.8);
+}
+
+.anatomy-sun-label {
+  position: absolute;
+  z-index: 8;
+  top: calc(14% + 24px);
+  left: calc(22% - 2px);
+  color: #f4d35e;
+  font: 850 0.47rem Consolas, monospace;
 }
 
 .anatomy-incoming-ray,
 .anatomy-reflected-ray {
   position: absolute;
-  z-index: 6;
+  z-index: 7;
   height: 3px;
   transform-origin: left center;
 }
 
 .anatomy-incoming-ray {
-  top: 24%;
-  left: 19%;
-  width: 29%;
+  top: 21%;
+  left: calc(22% + 18px);
+  width: 15.5%;
   background: linear-gradient(90deg, #f4d35e, #fff1a1);
-  transform: rotate(36deg);
+  transform: rotate(15deg);
 }
 
 .anatomy-incoming-ray::after {
@@ -1902,76 +1912,219 @@ a.secondary-action:focus {
 
 .anatomy-mirror {
   position: absolute;
-  z-index: 5;
-  top: 45%;
-  left: 37%;
-  width: 125px;
-  height: 66px;
+  z-index: 9;
+  top: 43%;
+  left: 39%;
+  width: 122px;
+  height: 64px;
   border: 2px solid #e4f7fc;
-  background: linear-gradient(145deg, #d5edf4, #7fb5c7);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
-  clip-path: polygon(8% 16%, 94% 0, 100% 76%, 0 100%);
+  background:
+    linear-gradient(18deg, transparent 49%, rgba(255, 255, 255, 0.48) 50%, transparent 51%),
+    linear-gradient(108deg, transparent 49%, rgba(255, 255, 255, 0.34) 50%, transparent 51%),
+    linear-gradient(145deg, #d8f0f6, #7eafc1);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  clip-path: polygon(8% 11%, 94% 0, 100% 80%, 0 100%);
   transform: translate(-50%, -50%);
 }
 
-.anatomy-mast {
+.anatomy-base {
   position: absolute;
-  z-index: 4;
-  top: 49%;
-  left: 37%;
-  width: 5px;
-  height: 42%;
-  background: #8098a8;
-  box-shadow: -48px 17px #6e8798, 48px 17px #6e8798;
+  z-index: 5;
+  bottom: 7%;
+  left: 39%;
+  width: 150px;
+  height: 20px;
+  border: 2px solid #7692a5;
+  background: rgba(51, 79, 97, 0.78);
+  clip-path: polygon(16% 0, 90% 0, 100% 58%, 0 100%);
+  transform: translateX(-50%);
 }
 
-.anatomy-mast::after {
+.anatomy-pedestal {
   position: absolute;
-  top: 69%;
-  left: -53px;
-  width: 110px;
-  height: 4px;
-  background: #6e8798;
+  z-index: 7;
+  top: 44%;
+  bottom: 11%;
+  left: 39%;
+  width: 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #698598, #a4b8c5, #698598);
+  transform: translateX(-50%);
+}
+
+.anatomy-fork {
+  position: absolute;
+  z-index: 6;
+  top: 45%;
+  width: 4px;
+  height: 43%;
+  border-radius: 3px;
+  background: #698598;
+  transform-origin: top center;
+}
+
+.anatomy-fork-left {
+  left: calc(39% - 48px);
+  transform: rotate(13deg);
+}
+
+.anatomy-fork-right {
+  left: calc(39% + 48px);
+  transform: rotate(-13deg);
+}
+
+.anatomy-pivot {
+  position: absolute;
+  z-index: 10;
+  top: 43%;
+  left: 39%;
+  width: 13px;
+  height: 13px;
+  border: 3px solid #ffb454;
+  border-radius: 50%;
+  background: #17364a;
+  transform: translate(-50%, -50%);
+}
+
+.anatomy-normal-vector {
+  position: absolute;
+  z-index: 11;
+  top: 43%;
+  left: 39%;
+  width: 3px;
+  height: 50px;
+  background: #ff9f43;
+  transform: translate(-50%, -100%) rotate(8deg);
+  transform-origin: bottom center;
+}
+
+.anatomy-normal-vector::before {
+  position: absolute;
+  top: -7px;
+  left: -4px;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid #ff9f43;
+  border-left: 5px solid transparent;
   content: "";
-  transform: rotate(-18deg);
 }
 
 .anatomy-reflected-ray {
-  top: 47%;
-  left: 40%;
-  width: 40%;
+  top: 43%;
+  left: 39%;
+  width: 37%;
   border-top: 2px dashed #dff8ff;
-  transform: rotate(-4deg);
+  transform: rotate(1deg);
+}
+
+.anatomy-reflected-ray::after {
+  position: absolute;
+  top: -5px;
+  right: -2px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid #dff8ff;
+  content: "";
+}
+
+.anatomy-rail {
+  position: absolute;
+  z-index: 3;
+  bottom: 12%;
+  left: 39%;
+  width: 38%;
+  height: 3px;
+  background: #8da2af;
+  transform-origin: left center;
+}
+
+.anatomy-rail-one {
+  transform: rotate(-1deg);
+}
+
+.anatomy-rail-two {
+  bottom: 7%;
+  background: #587487;
+  transform: rotate(1.4deg);
 }
 
 .anatomy-receiver {
   position: absolute;
-  z-index: 5;
-  top: 31%;
-  right: 11%;
-  width: 44px;
-  height: 73px;
+  z-index: 9;
+  top: 23%;
+  left: 76%;
+  display: grid;
+  grid-template-columns: repeat(4, 19px);
+  grid-auto-rows: 22px;
+  gap: 2px;
+  width: 94px;
+  min-height: 82px;
+  align-content: center;
+  justify-content: center;
+  padding: 7px 5px;
   border: 3px solid #d4ad5b;
-  border-radius: 45% 45% 10% 10%;
-  background:
-    repeating-linear-gradient(90deg, #6c5125 0 5px, #e5ca88 5px 10px);
-  box-shadow: 0 0 17px rgba(231, 188, 92, 0.2);
+  border-radius: 42% 42% 12% 12%;
+  background: rgba(85, 63, 28, 0.72);
+  box-shadow: 0 0 20px rgba(231, 188, 92, 0.23);
+  transform: translateX(-50%);
 }
 
-.anatomy-receiver::after {
+.anatomy-facet {
+  display: block;
+  width: 19px;
+  height: 22px;
+  clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%);
+  background: linear-gradient(145deg, #f1d790, #b88736);
+  box-shadow: inset 0 0 0 1px rgba(255, 247, 214, 0.72);
+}
+
+.anatomy-receiver-stand {
   position: absolute;
-  top: 69px;
-  left: 18px;
-  width: 4px;
-  height: 85px;
-  background: #798e9c;
+  z-index: 6;
+  top: calc(23% + 82px);
+  bottom: 8%;
+  left: 76%;
+  width: 5px;
+  background: linear-gradient(90deg, #657e8e, #a2b4bf, #657e8e);
+  transform: translateX(-50%);
+}
+
+.anatomy-receiver-stand::after {
+  position: absolute;
+  right: -36px;
+  bottom: -2px;
+  width: 76px;
+  height: 5px;
+  background: #718a99;
   content: "";
+  transform: skewX(-24deg);
+}
+
+.anatomy-object-label {
+  position: absolute;
+  z-index: 12;
+  padding: 3px 6px;
+  border: 1px solid #35566b;
+  border-radius: 4px;
+  color: #cce2ec;
+  background: rgba(10, 28, 41, 0.84);
+  font: 800 0.45rem Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.anatomy-heliostat-label {
+  bottom: 9%;
+  left: calc(39% - 48px);
+}
+
+.anatomy-concentrator-label {
+  top: calc(23% + 92px);
+  left: calc(76% + 12px);
 }
 
 .anatomy-scene-note {
   position: absolute;
+  top: 9px;
   right: 9px;
-  bottom: 8px;
   display: flex;
   flex-direction: column;
   padding: 6px 8px;

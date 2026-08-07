@@ -468,8 +468,294 @@ def manual_chapter(title: str, *children: object, opened: bool = False) -> objec
     )
 
 
-def manual_panel() -> object:
+def manual_visual_overview() -> object:
+    steps = (
+        ("01", "Reloj", "Fecha, hora y zona UTC"),
+        ("02", "Sol", "Altura, acimut y vector S"),
+        ("03", "Objetivo", "Vector R hacia el receptor"),
+        ("04", "Orientación", "Normal ideal y motores"),
+        ("05", "Reflexión", "Rayo reflejado por N"),
+        ("06", "Impacto", "Coordenadas u, v y error"),
+        ("07", "Facetas", "Rayos e intensidad"),
+        ("08", "Resultados", "Gráficas, diagnóstico y CSV"),
+    )
     return ui.div(
+        ui.div(
+            ui.h3("Cómo fluye la simulación"),
+            ui.p("El programa transforma las entradas en resultados siguiendo siempre esta cadena."),
+            class_="manual-section-heading",
+        ),
+        ui.div(
+            *(
+                ui.div(
+                    ui.span(number_text, class_="flow-number"),
+                    ui.strong(title),
+                    ui.tags.small(description),
+                    class_="flow-step",
+                )
+                for number_text, title, description in steps
+            ),
+            class_="manual-flow",
+        ),
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.span("Z", class_="axis-letter axis-z-letter"),
+                    ui.span("+ cenit", class_="axis-label axis-z-label"),
+                    ui.span("X", class_="axis-letter axis-x-letter"),
+                    ui.span("+ oeste / − este", class_="axis-label axis-x-label"),
+                    ui.span("Y", class_="axis-letter axis-y-letter"),
+                    ui.span("+ sur / − norte", class_="axis-label axis-y-label"),
+                    ui.span(class_="axis-origin"),
+                    ui.span(class_="axis-line axis-x"),
+                    ui.span(class_="axis-line axis-y"),
+                    ui.span(class_="axis-line axis-z"),
+                    class_="axis-diagram",
+                ),
+                ui.div(
+                    ui.h4("Orientación local"),
+                    ui.p("La misma convención se usa en el modelo 3D, el target, las facetas y los impactos."),
+                ),
+                class_="visual-card orientation-card",
+            ),
+            ui.div(
+                ui.h4("Lectura rápida de estados"),
+                ui.div(ui.span(class_="status-dot status-green"), ui.span("Verde · cálculo estable o en objetivo")),
+                ui.div(ui.span(class_="status-dot status-blue"), ui.span("Azul · configuración o referencia")),
+                ui.div(ui.span(class_="status-dot status-gold"), ui.span("Dorado · movimiento o advertencia")),
+                ui.div(ui.span(class_="status-dot status-red"), ui.span("Rojo · pausa o condición no válida")),
+                class_="visual-card state-legend-card",
+            ),
+            ui.div(
+                ui.h4("Tres lecturas esenciales"),
+                ui.div(ui.strong("AZ / EL"), ui.span("Pose y objetivo del heliostato"), class_="reading-row"),
+                ui.div(ui.strong("u / v"), ui.span("Posición del impacto en el receptor"), class_="reading-row"),
+                ui.div(ui.strong("r"), ui.span("Distancia radial al centro"), class_="reading-row"),
+                class_="visual-card",
+            ),
+            class_="manual-visual-grid",
+        ),
+        class_="manual-visual-overview",
+    )
+
+
+def formula_card(title: str, formula_html: str, explanation: str, variables: str) -> object:
+    return ui.div(
+        ui.div(title, class_="formula-title"),
+        ui.div(ui.HTML(formula_html), class_="formula-expression"),
+        ui.p(explanation, class_="formula-explanation"),
+        ui.div(variables, class_="formula-variables"),
+        class_="formula-card",
+    )
+
+
+def mathematics_panel() -> object:
+    return ui.div(
+        ui.div(
+            ui.div("REFERENCIA MATEMÁTICA", class_="manual-kicker"),
+            ui.h2("Ecuaciones que realmente ejecuta el simulador"),
+            ui.p("Las expresiones siguen la convención +X oeste, +Y sur y +Z cenit. Los vectores con sombrero son unitarios."),
+            class_="manual-hero math-hero",
+        ),
+        ui.div(
+            ui.span("Reloj solar"), ui.span("→"), ui.span("Vectores"), ui.span("→"),
+            ui.span("Normal"), ui.span("→"), ui.span("Reflexión"), ui.span("→"),
+            ui.span("Impacto"), ui.span("→"), ui.span("Facetas e intensidad"),
+            class_="math-process-strip",
+        ),
+        ui.h3("1. Posición solar"),
+        ui.div(
+            formula_card(
+                "Ángulo anual auxiliar",
+                '<math display="block" aria-label="B igual a dos pi por n menos 81 entre 364"><mi>B</mi><mo>=</mo><mfrac><mrow><mn>2</mn><mi>π</mi><mo>(</mo><mi>n</mi><mo>−</mo><mn>81</mn><mo>)</mo></mrow><mn>364</mn></mfrac></math>',
+                "Transforma el número de día del año en una fase anual usada por la ecuación del tiempo.",
+                "n: día del año · B: radianes",
+            ),
+            formula_card(
+                "Ecuación del tiempo",
+                '<math display="block" aria-label="E T igual a 9.87 seno de 2B menos 7.53 coseno B menos 1.5 seno B"><mi>E</mi><mi>T</mi><mo>=</mo><mn>9.87</mn><mi>sin</mi><mo>(</mo><mn>2</mn><mi>B</mi><mo>)</mo><mo>−</mo><mn>7.53</mn><mi>cos</mi><mo>(</mo><mi>B</mi><mo>)</mo><mo>−</mo><mn>1.5</mn><mi>sin</mi><mo>(</mo><mi>B</mi><mo>)</mo></math>',
+                "Corrige la diferencia entre hora civil y hora solar aparente.",
+                "ET: minutos",
+            ),
+            formula_card(
+                "Declinación solar",
+                '<math display="block" aria-label="delta igual a 23.45 grados por seno"><mi>δ</mi><mo>=</mo><mn>23.45</mn><mo>°</mo><mi>sin</mi><mrow><mo>[</mo><mfrac><mrow><mn>2</mn><mi>π</mi><mo>(</mo><mn>284</mn><mo>+</mo><mi>n</mi><mo>)</mo></mrow><mn>365</mn></mfrac><mo>]</mo></mrow></math>',
+                "Aproxima la inclinación aparente del Sol respecto al ecuador terrestre.",
+                "δ: grados solares",
+            ),
+            formula_card(
+                "Altura solar",
+                '<math display="block" aria-label="seno de alfa"><mi>sin</mi><mi>α</mi><mo>=</mo><mi>sin</mi><mi>φ</mi><mi>sin</mi><mi>δ</mi><mo>+</mo><mi>cos</mi><mi>φ</mi><mi>cos</mi><mi>δ</mi><mi>cos</mi><mi>ω</mi></math>',
+                "Calcula la altura sobre el horizonte usando latitud, declinación y ángulo horario.",
+                "α: altura · φ: latitud · ω: ángulo horario",
+            ),
+            class_="formula-grid",
+        ),
+        ui.p("D&B usa estas aproximaciones. REDA conserva la misma estructura y agrega pequeñas correcciones armónicas para comparación.", class_="math-note"),
+        ui.h3("2. Geometría óptica del heliostato"),
+        ui.div(
+            formula_card(
+                "Vector solar",
+                '<math display="block" aria-label="vector S"><mover><mi>S</mi><mo>^</mo></mover><mo>=</mo><mo>(</mo><mi>cos</mi><mi>α</mi><mi>sin</mi><mi>A</mi><mo>,</mo><mi>cos</mi><mi>α</mi><mi>cos</mi><mi>A</mi><mo>,</mo><mi>sin</mi><mi>α</mi><mo>)</mo></math>',
+                "Convierte altura y acimut solar al sistema cartesiano del laboratorio.",
+                "A: acimut, 0° sur y positivo al oeste",
+            ),
+            formula_card(
+                "Dirección al target",
+                '<math display="block" aria-label="T unitario igual a R sobre norma de R"><mover><mi>T</mi><mo>^</mo></mover><mo>=</mo><mfrac><mover><mi>R</mi><mo>→</mo></mover><mrow><mo>‖</mo><mover><mi>R</mi><mo>→</mo></mover><mo>‖</mo></mrow></mfrac><mo>,</mo><mover><mi>R</mi><mo>→</mo></mover><mo>=</mo><mo>(</mo><mi>RX</mi><mo>,</mo><mi>RY</mi><mo>,</mo><mi>RZ</mi><mo>)</mo></math>',
+                "Normaliza las coordenadas del receptor medidas desde el centro óptico del espejo.",
+                "R: metros · T: vector unitario",
+            ),
+            formula_card(
+                "Normal ideal",
+                '<math display="block" aria-label="N unitario igual a S más T normalizado"><mover><mi>N</mi><mo>^</mo></mover><mo>=</mo><mfrac><mrow><mover><mi>S</mi><mo>^</mo></mover><mo>+</mo><mover><mi>T</mi><mo>^</mo></mover></mrow><mrow><mo>‖</mo><mover><mi>S</mi><mo>^</mo></mover><mo>+</mo><mover><mi>T</mi><mo>^</mo></mover><mo>‖</mo></mrow></mfrac></math>',
+                "La bisectriz entre la dirección solar y el objetivo determina la orientación ideal del espejo.",
+                "N: normal óptica unitaria",
+            ),
+            formula_card(
+                "Normal desde AZ/EL",
+                '<math display="block" aria-label="normal desde acimut y elevación"><mover><mi>N</mi><mo>^</mo></mover><mo>=</mo><mo>(</mo><mi>cos</mi><mi>EL</mi><mi>sin</mi><mi>AZ</mi><mo>,</mo><mi>cos</mi><mi>EL</mi><mi>cos</mi><mi>AZ</mi><mo>,</mo><mi>sin</mi><mi>EL</mi><mo>)</mo></math>',
+                "Reconstruye la normal real a partir de la pose simulada y de los errores activos.",
+                "AZ, EL: grados convertidos internamente a radianes",
+            ),
+            formula_card(
+                "Ley de reflexión",
+                '<math display="block" aria-label="dirección reflejada"><msub><mover><mi>d</mi><mo>→</mo></mover><mi>r</mi></msub><mo>=</mo><msub><mover><mi>d</mi><mo>→</mo></mover><mi>i</mi></msub><mo>−</mo><mn>2</mn><mo>(</mo><msub><mover><mi>d</mi><mo>→</mo></mover><mi>i</mi></msub><mo>·</mo><mover><mi>N</mi><mo>^</mo></mover><mo>)</mo><mover><mi>N</mi><mo>^</mo></mover></math>',
+                "Refleja la dirección incidente di = −S sobre la normal real del espejo.",
+                "dr: rayo reflejado · di: rayo incidente",
+            ),
+            class_="formula-grid",
+        ),
+        ui.h3("3. Intersección con el receptor"),
+        ui.div(
+            formula_card(
+                "Parámetro de intersección",
+                '<math display="block" aria-label="lambda de intersección"><mi>λ</mi><mo>=</mo><mfrac><mrow><mo>(</mo><mover><mi>R</mi><mo>→</mo></mover><mo>−</mo><mover><mi>O</mi><mo>→</mo></mover><mo>)</mo><mo>·</mo><msub><mover><mi>n</mi><mo>^</mo></mover><mi>r</mi></msub></mrow><mrow><msub><mover><mi>d</mi><mo>→</mo></mover><mi>r</mi></msub><mo>·</mo><msub><mover><mi>n</mi><mo>^</mo></mover><mi>r</mi></msub></mrow></mfrac></math>',
+                "Encuentra dónde el rayo cruza el plano receptor. Si el denominador es casi cero o λ ≤ 0, no existe impacto frontal válido.",
+                "O: origen del rayo · nr = R/‖R‖",
+            ),
+            formula_card(
+                "Punto de impacto",
+                '<math display="block" aria-label="P de lambda"><mover><mi>P</mi><mo>→</mo></mover><mo>(</mo><mi>λ</mi><mo>)</mo><mo>=</mo><mover><mi>O</mi><mo>→</mo></mover><mo>+</mo><mi>λ</mi><msub><mover><mi>d</mi><mo>→</mo></mover><mi>r</mi></msub></math>',
+                "El punto se proyecta sobre dos ejes del plano: u horizontal hacia el oeste y v vertical hacia el cenit.",
+                "P, O: metros",
+            ),
+            formula_card(
+                "Error radial",
+                '<math display="block" aria-label="error radial"><msub><mi>e</mi><mi>r</mi></msub><mo>=</mo><msqrt><mrow><msup><mi>u</mi><mn>2</mn></msup><mo>+</mo><msup><mi>v</mi><mn>2</mn></msup></mrow></msqrt></math>',
+                "Resume en una sola magnitud la distancia entre el impacto y el centro nominal.",
+                "u, v, er: metros; la interfaz los muestra en milímetros",
+            ),
+            class_="formula-grid",
+        ),
+        ui.h3("4. Movimiento y corrección"),
+        ui.div(
+            formula_card(
+                "Velocidad del eje",
+                '<math display="block" aria-label="omega igual PWM por omega máxima"><mi>ω</mi><mo>=</mo><mi>PWM</mi><mo>·</mo><msub><mi>ω</mi><mi>máx</mi></msub></math>',
+                "Cada paso se limita para no rebasar el objetivo ni los límites mecánicos.",
+                "PWM: 0 a 1 · ω: grados por segundo",
+            ),
+            formula_card(
+                "Corrección incremental",
+                '<math display="block" aria-label="corrección nueva"><msub><mi>c</mi><mi>nueva</mi></msub><mo>=</mo><msub><mi>c</mi><mi>actual</mi></msub><mo>+</mo><mi>g</mi><mo>(</mo><mo>−</mo><mi>e</mi><mo>−</mo><msub><mi>c</mi><mi>actual</mi></msub><mo>)</mo></math>',
+                "CORREGIR AHORA elimina una fracción g del error restante; por eso converge progresivamente.",
+                "g: ganancia de 0 a 1 · e: offset más deriva acumulada",
+            ),
+            class_="formula-grid",
+        ),
+        ui.h3("5. Facetas y mapa de intensidad"),
+        ui.div(
+            formula_card(
+                "Foco del concentrador",
+                '<math display="block" aria-label="foco igual R menos focal por normal"><mover><mi>F</mi><mo>→</mo></mover><mo>=</mo><mover><mi>R</mi><mo>→</mo></mover><mo>−</mo><mi>f</mi><msub><mover><mi>n</mi><mo>^</mo></mover><mi>r</mi></msub></math>',
+                "Sitúa el plano de enfoque a una distancia focal f hacia el heliostato.",
+                "f: distancia focal en metros",
+            ),
+            formula_card(
+                "Normal de cada faceta",
+                '<math display="block" aria-label="normal de faceta"><msub><mover><mi>N</mi><mo>^</mo></mover><mi>k</mi></msub><mo>=</mo><mfrac><mrow><msub><mover><mi>d</mi><mo>^</mo></mover><mi>i</mi></msub><mo>−</mo><msub><mover><mi>a</mi><mo>^</mo></mover><mi>k</mi></msub></mrow><mrow><mo>‖</mo><msub><mover><mi>d</mi><mo>^</mo></mover><mi>i</mi></msub><mo>−</mo><msub><mover><mi>a</mi><mo>^</mo></mover><mi>k</mi></msub><mo>‖</mo></mrow></mfrac></math>',
+                "Orienta el rayo central de la faceta k hacia el foco; después pueden aplicarse desalineaciones H/V.",
+                "ak: dirección desde la faceta k al foco",
+            ),
+            formula_card(
+                "Gaussiana elíptica",
+                '<math display="block" aria-label="intensidad gaussiana"><mi>I</mi><mo>(</mo><mi>u</mi><mo>,</mo><mi>v</mi><mo>)</mo><mo>=</mo><mi>w</mi><mi>exp</mi><mrow><mo>{</mo><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>[</mo><msup><mrow><mo>(</mo><mfrac><mi>a</mi><msub><mi>σ</mi><mi>mayor</mi></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><msup><mrow><mo>(</mo><mfrac><mi>b</mi><msub><mi>σ</mi><mi>menor</mi></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo><mo>}</mo></mrow></math>',
+                "Cada impacto aporta una mancha; el programa suma todas las contribuciones activas hasta 3.5σ.",
+                "σmenor = σbase · σmayor = σbase/|cos(incidencia)|",
+            ),
+            formula_card(
+                "Centroide energético",
+                '<math display="block" aria-label="centroide u"><mover><mi>u</mi><mo>¯</mo></mover><mo>=</mo><mfrac><mrow><mo>∑</mo><mi>I</mi><mi>u</mi></mrow><mrow><mo>∑</mo><mi>I</mi></mrow></mfrac><mo>,</mo><mover><mi>v</mi><mo>¯</mo></mover><mo>=</mo><mfrac><mrow><mo>∑</mo><mi>I</mi><mi>v</mi></mrow><mrow><mo>∑</mo><mi>I</mi></mrow></mfrac></math>',
+                "La covarianza alrededor del centroide produce sigma mayor, sigma menor y orientación del spot.",
+                "La forma se clasifica como circular, elíptica o alargada",
+            ),
+            class_="formula-grid",
+        ),
+        ui.div(
+            ui.strong("Supuestos del modelo"),
+            ui.span("Óptica geométrica con rayos centrales, receptor plano, facetas rígidas y spot gaussiano aproximado. No se modelan sombras, clima, deformación térmica ni potencia radiométrica absoluta."),
+            class_="math-warning",
+        ),
+        class_="manual-panel mathematics-panel",
+    )
+
+
+def about_panel() -> object:
+    capabilities = (
+        ("SOL", "Posición solar D&B y canal REDA aproximado"),
+        ("3D", "Heliostato, receptor, riel, vectores y cámara libre"),
+        ("SPOT", "Impacto u/v, tolerancia y error radial"),
+        ("FACETAS", "Acomodo, rayos, desalineación e intensidad"),
+        ("TIEMPO", "Reloj real o simulado con multiplicador"),
+        ("DATOS", "Historial local, diagnóstico y exportación CSV"),
+    )
+    return ui.div(
+        ui.div(
+            ui.div("ACERCA DEL PROGRAMA", class_="manual-kicker"),
+            ui.h2("Gemelo digital didáctico del mini horno solar"),
+            ui.p("La edición web ejecuta la física y los gráficos en la máquina que abre la página mediante Python en WebAssembly. No requiere instalar el programa de escritorio ni envía la simulación a un servidor."),
+            class_="manual-hero about-hero",
+        ),
+        ui.div(
+            *(ui.div(ui.strong(code), ui.span(description), class_="capability-card") for code, description in capabilities),
+            class_="capability-grid",
+        ),
+        ui.div(
+            ui.div(
+                ui.h3("Propósito"),
+                ui.p("Estudiar la geometría solar, el seguimiento de dos ejes, los errores de puntería, la corrección y el comportamiento de un concentrador facetado antes de realizar pruebas físicas."),
+            ),
+            ui.div(
+                ui.h3("Arquitectura"),
+                ui.p("El núcleo matemático está escrito en Python. Shiny coordina controles y resultados. Three.js representa el gemelo 3D. Shinylive/Pyodide ejecuta todo localmente dentro del navegador."),
+            ),
+            ui.div(
+                ui.h3("Unidades y convención"),
+                ui.p("Metros, grados, grados por segundo y milímetros en las lecturas del receptor. +X oeste, +Y sur, +Z cenit; AZ 0° al sur."),
+            ),
+            ui.div(
+                ui.h3("Alcance"),
+                ui.p("Es un simulador educativo y de ingeniería preliminar. No sustituye medición experimental, análisis estructural, trazado radiométrico ni validación de seguridad."),
+            ),
+            class_="about-grid",
+        ),
+        ui.div(
+            ui.h3("Flujo conceptual"),
+            manual_visual_overview(),
+            class_="about-flow-block",
+        ),
+        ui.div(
+            ui.strong("Versión web 0.3.1"),
+            ui.span("Manual visual y referencia matemática integrados."),
+            class_="version-card",
+        ),
+        class_="manual-panel about-panel",
+    )
+
+
+def manual_panel() -> object:
+    guide = ui.div(
         ui.div(
             ui.div("MANUAL DE USUARIO", class_="manual-kicker"),
             ui.h2("Gemelo digital del mini horno solar · edición web"),
@@ -561,6 +847,15 @@ def manual_panel() -> object:
             ),
         ),
         class_="manual-panel",
+    )
+    return ui.div(
+        ui.navset_card_tab(
+            ui.nav_panel("Guía visual", guide),
+            ui.nav_panel("Matemáticas", mathematics_panel()),
+            ui.nav_panel("Acerca de", about_panel()),
+            id="manual_section",
+        ),
+        class_="manual-shell",
     )
 
 
@@ -678,7 +973,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.0"),
+            ui.h1("Mini horno solar · Web 0.3.1"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),

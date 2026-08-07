@@ -28,9 +28,14 @@ CSV_COLUMN_DICTIONARY = (
             ("timestamp", "Fecha y hora del reloj del experimento para esta muestra, en formato ISO 8601.", "fecha-hora"),
             ("time_mode", "Origen del reloj: Tiempo real o Fecha simulada.", "texto"),
             ("time_scale", "Multiplicador aplicado al avance del reloj cuando se usa fecha simulada.", "factor ×"),
+            ("simulation_step_s", "Cantidad de segundos usada por el boton de avance manual.", "s"),
             ("mode", "Modo de operación del heliostato: Automático, Manual o Home.", "texto"),
+            ("tracking", "Indica si el seguimiento solar automatico estaba habilitado.", "True / False"),
+            ("session_started", "Indica si la sesion ya habia sido iniciada al menos una vez.", "True / False"),
             ("running", "Indica si la simulación estaba avanzando al crear la muestra.", "True / False"),
+            ("replay_active", "Indica si la interfaz estaba mostrando una reproducción del historial.", "True / False"),
             ("iterations", "Número acumulado de actualizaciones ejecutadas desde el inicio de la sesión.", "conteo"),
+            ("history_limit", "Maximo de muestras temporales conservadas en memoria.", "conteo"),
         ),
     ),
     (
@@ -87,11 +92,165 @@ CSV_COLUMN_DICTIONARY = (
             ("facet_focal_distance_m", "Distancia focal utilizada para orientar las facetas hacia el foco.", "m"),
             ("facet_selected_id", "Identificador de la faceta seleccionada para edición, por ejemplo F5.", "texto"),
             ("facet_active_count", "Cantidad de facetas que contribuyen activamente al cálculo.", "conteo"),
+            ("facet_active_ids", "Lista separada por comas de las facetas activas.", "texto"),
             ("facet_misalignment_h_deg", "Desalineación horizontal aplicada a la faceta seleccionada.", "grados"),
             ("facet_misalignment_v_deg", "Desalineación vertical aplicada a la faceta seleccionada.", "grados"),
             ("spot_map_enabled", "Indica si estaba activado el cálculo del mapa de intensidad.", "True / False"),
             ("spot_map_resolution", "Cantidad de puntos por lado de la cuadrícula del mapa; siempre debe ser impar.", "puntos/lado"),
             ("spot_normalization", "Regla de escala del mapa: total, pico o sin normalizar.", "texto"),
+            ("spot_base_sigma_m", "Sigma base usada para cada contribucion gaussiana.", "m"),
+            ("spot_map_half_size_m", "Semiancho fisico cubierto por el mapa de intensidad.", "m"),
+        ),
+    ),
+    (
+        "Comparacion de escenarios",
+        "Resultados simultaneos del caso ideal, el caso perturbado y el caso corregido.",
+        "green",
+        (
+            ("error_mode", "Escenario elegido para alimentar el gemelo 3D y la lectura principal.", "texto"),
+            ("active_errors", "Lista legible de las fuentes de error habilitadas.", "texto"),
+            ("ideal_spot_u_mm", "Componente horizontal del impacto sin errores.", "mm"),
+            ("ideal_spot_v_mm", "Componente vertical del impacto sin errores.", "mm"),
+            ("ideal_spot_radial_mm", "Distancia radial del impacto ideal al centro.", "mm"),
+            ("error_spot_u_mm", "Componente horizontal con errores y sin compensacion.", "mm"),
+            ("error_spot_v_mm", "Componente vertical con errores y sin compensacion.", "mm"),
+            ("error_spot_radial_mm", "Distancia radial con errores y sin compensacion.", "mm"),
+            ("corrected_spot_u_mm", "Componente horizontal despues de aplicar la correccion.", "mm"),
+            ("corrected_spot_v_mm", "Componente vertical despues de aplicar la correccion.", "mm"),
+            ("corrected_spot_radial_mm", "Distancia radial despues de aplicar la correccion.", "mm"),
+        ),
+    ),
+    (
+        "Configuracion de errores",
+        "Interruptores y magnitudes exactas usadas para perturbar el modelo.",
+        "red",
+        (
+            ("error_enable_azimuth_offset", "Activa el offset fijo de acimut.", "True / False"),
+            ("error_azimuth_offset_deg", "Magnitud del offset fijo de acimut.", "grados"),
+            ("error_enable_elevation_offset", "Activa el offset fijo de elevacion.", "True / False"),
+            ("error_elevation_offset_deg", "Magnitud del offset fijo de elevacion.", "grados"),
+            ("error_enable_north_south", "Activa la desalineacion del marco norte-sur.", "True / False"),
+            ("error_north_south_deg", "Magnitud angular de la desalineacion norte-sur.", "grados"),
+            ("error_enable_target_xyz", "Activa el desplazamiento XYZ del receptor.", "True / False"),
+            ("error_target_x_m", "Desplazamiento del receptor sobre X, oeste positivo.", "m"),
+            ("error_target_y_m", "Desplazamiento del receptor sobre Y, sur positivo.", "m"),
+            ("error_target_z_m", "Desplazamiento del receptor sobre Z, cenit positivo.", "m"),
+            ("error_enable_heliostat_xyz", "Activa el error XYZ de posicion del heliostato.", "True / False"),
+            ("error_heliostat_x_m", "Error de posicion del heliostato sobre X.", "m"),
+            ("error_heliostat_y_m", "Error de posicion del heliostato sobre Y.", "m"),
+            ("error_heliostat_z_m", "Error de posicion del heliostato sobre Z.", "m"),
+            ("error_enable_peralte", "Activa un error adicional de peralte.", "True / False"),
+            ("error_peralte_deg", "Magnitud del error adicional de peralte.", "grados"),
+            ("error_enable_backlash", "Activa el juego mecanico al cambiar la orden.", "True / False"),
+            ("error_backlash_deg", "Magnitud angular del backlash.", "grados"),
+            ("error_enable_directional", "Activa errores distintos para subida y bajada.", "True / False"),
+            ("error_upward_deg", "Error aplicado cuando la elevacion aumenta.", "grados"),
+            ("error_downward_deg", "Error aplicado cuando la elevacion disminuye.", "grados"),
+            ("error_enable_noise", "Activa ruido aleatorio reproducible.", "True / False"),
+            ("error_noise_std_deg", "Desviacion estandar del ruido angular.", "grados"),
+            ("error_noise_seed", "Semilla usada para repetir la misma secuencia de ruido.", "entero"),
+            ("drift_az_deg_per_hour", "Tasa de deriva temporal en acimut.", "grados/h"),
+            ("drift_el_deg_per_hour", "Tasa de deriva temporal en elevacion.", "grados/h"),
+        ),
+    ),
+    (
+        "Seguimiento y correccion",
+        "Programador de actualizaciones, estadisticas por intervalo y compensacion aplicada.",
+        "blue",
+        (
+            ("tracking_update_interval_s", "Intervalo solar entre capturas del objetivo o texto manual.", "s / texto"),
+            ("seconds_since_tracking_update_s", "Tiempo solar transcurrido desde la ultima captura.", "s"),
+            ("tracking_update_count", "Numero de objetivos solares capturados en la sesion.", "conteo"),
+            ("tracking_error_max_mm", "Mayor error radial observado en el ultimo intervalo cerrado.", "mm"),
+            ("tracking_error_average_mm", "Promedio del error radial del ultimo intervalo cerrado.", "mm"),
+            ("tracking_error_rms_mm", "Valor RMS del error radial del ultimo intervalo cerrado.", "mm"),
+            ("correction_enabled", "Indica si el modelo de correccion estaba habilitado.", "True / False"),
+            ("correction_strategy", "Estrategia de correccion seleccionada.", "texto"),
+            ("correction_update_count", "Numero de veces que la compensacion fue modificada.", "conteo"),
+            ("correction_constant_az_deg", "Termino constante de correccion en acimut.", "grados"),
+            ("correction_constant_el_deg", "Termino constante de correccion en elevacion.", "grados"),
+            ("correction_rate_az_deg_per_hour", "Tasa temporal de correccion en acimut.", "grados/h"),
+            ("correction_rate_el_deg_per_hour", "Tasa temporal de correccion en elevacion.", "grados/h"),
+            ("correction_poly_az_c0", "Coeficiente c0 del polinomio de acimut.", "grados"),
+            ("correction_poly_az_c1", "Coeficiente c1 del polinomio de acimut.", "grados/h"),
+            ("correction_poly_az_c2", "Coeficiente c2 del polinomio de acimut.", "grados/h2"),
+            ("correction_poly_el_c0", "Coeficiente c0 del polinomio de elevacion.", "grados"),
+            ("correction_poly_el_c1", "Coeficiente c1 del polinomio de elevacion.", "grados/h"),
+            ("correction_poly_el_c2", "Coeficiente c2 del polinomio de elevacion.", "grados/h2"),
+            ("correction_gain", "Ganancia aplicada a la correccion basada en impacto.", "0 a 1"),
+            ("correction_max_step_deg", "Cambio angular maximo permitido por observacion.", "grados"),
+            ("correction_camera_interval_s", "Periodo entre observaciones de la camara periodica.", "s"),
+        ),
+    ),
+    (
+        "Ubicacion, control y encoders",
+        "Calibracion solar, limites y estado de los actuadores simulados.",
+        "gold",
+        (
+            ("lat_deg", "Latitud geografica usada por el calculo solar.", "grados"),
+            ("lon_deg", "Longitud geografica usada por el calculo solar.", "grados"),
+            ("utc_offset_hours", "Diferencia de la hora civil respecto de UTC.", "h"),
+            ("solar_method", "Metodo solar elegido para la muestra.", "texto"),
+            ("target_x_m", "Coordenada X efectiva del receptor.", "m"),
+            ("target_y_m", "Coordenada Y efectiva del receptor.", "m"),
+            ("target_z_m", "Coordenada Z efectiva del receptor.", "m"),
+            ("peralte_deg", "Peralte calibrado entre la lectura mecanica y la normal optica.", "grados"),
+            ("cdr_deg", "Banda muerta angular del controlador.", "grados"),
+            ("camera_offset_az_deg", "Offset de calibracion de camara en acimut.", "grados"),
+            ("camera_offset_el_deg", "Offset de calibracion de camara en elevacion.", "grados"),
+            ("control_delay_s", "Retardo nominal configurado para el lazo de control.", "s"),
+            ("az_limit_min_deg", "Limite mecanico minimo permitido en acimut.", "grados"),
+            ("az_limit_max_deg", "Limite mecanico maximo permitido en acimut.", "grados"),
+            ("el_limit_min_deg", "Limite mecanico minimo permitido en elevacion.", "grados"),
+            ("el_limit_max_deg", "Limite mecanico maximo permitido en elevacion.", "grados"),
+            ("az_motor_on", "Estado habilitado del motor de acimut.", "True / False"),
+            ("el_motor_on", "Estado habilitado del motor de elevacion.", "True / False"),
+            ("az_pwm", "Fraccion PWM aplicada al motor de acimut.", "0 a 1"),
+            ("el_pwm", "Fraccion PWM aplicada al motor de elevacion.", "0 a 1"),
+            ("az_speed_deg_s", "Velocidad maxima configurada en acimut.", "grados/s"),
+            ("el_speed_deg_s", "Velocidad maxima configurada en elevacion.", "grados/s"),
+            ("az_encoder_counts", "Lectura simulada del encoder de acimut.", "conteos"),
+            ("el_encoder_counts", "Lectura simulada del encoder de elevacion.", "conteos"),
+            ("az_counts_per_degree", "Factor de conversion del encoder de acimut.", "conteos/grado"),
+            ("el_counts_per_degree", "Factor de conversion del encoder de elevacion.", "conteos/grado"),
+        ),
+    ),
+    (
+        "Vectores y presentacion 3D",
+        "Componentes numericas de los vectores y visibilidad elegida en el gemelo.",
+        "teal",
+        (
+            ("sun_x", "Componente X del vector unitario hacia el Sol.", "adimensional"),
+            ("sun_y", "Componente Y del vector unitario hacia el Sol.", "adimensional"),
+            ("sun_z", "Componente Z del vector unitario hacia el Sol.", "adimensional"),
+            ("normal_x", "Componente X de la normal optica mostrada.", "adimensional"),
+            ("normal_y", "Componente Y de la normal optica mostrada.", "adimensional"),
+            ("normal_z", "Componente Z de la normal optica mostrada.", "adimensional"),
+            ("reflected_x", "Componente X del rayo reflejado.", "adimensional"),
+            ("reflected_y", "Componente Y del rayo reflejado.", "adimensional"),
+            ("reflected_z", "Componente Z del rayo reflejado.", "adimensional"),
+            ("show_sun_vector", "Indica si el vector solar era visible en 3D.", "True / False"),
+            ("show_normal_vector", "Indica si la normal era visible en 3D.", "True / False"),
+            ("show_reflected_vector", "Indica si el reflejado era visible en 3D.", "True / False"),
+            ("show_target_direction", "Indica si la flecha corta hacia el objetivo era visible.", "True / False"),
+            ("show_target_line", "Indica si la linea completa al receptor era visible.", "True / False"),
+            ("show_mechanical_guides", "Indica si las guias mecanicas auxiliares estaban habilitadas.", "True / False"),
+        ),
+    ),
+    (
+        "Metricas de facetas e intensidad",
+        "Resultados agregados del trazado de facetas y del mapa calculado.",
+        "red",
+        (
+            ("facet_error_max_mm", "Mayor distancia de un impacto de faceta respecto del foco.", "mm"),
+            ("facet_error_average_mm", "Promedio de las distancias de impacto respecto del foco.", "mm"),
+            ("spot_centroid_u_mm", "Coordenada horizontal del centroide del mapa.", "mm"),
+            ("spot_centroid_v_mm", "Coordenada vertical del centroide del mapa.", "mm"),
+            ("spot_centroid_error_mm", "Distancia radial del centroide respecto del foco.", "mm"),
+            ("spot_maximum_intensity", "Mayor intensidad numerica de una celda.", "segun normalizacion"),
+            ("spot_total_intensity", "Suma de intensidades de todas las celdas.", "segun normalizacion"),
+            ("spot_equivalent_diameter_mm", "Diametro equivalente estimado del spot.", "mm"),
+            ("spot_shape", "Clasificacion descriptiva de la forma del spot.", "texto"),
         ),
     ),
     (
@@ -219,7 +378,12 @@ def spot_svg(sample: dict[str, object], history: list[dict[str, object]], tolera
     u_mm = float(sample["spot_u_mm"])
     v_mm = float(sample["spot_v_mm"])
     radial_mm = float(sample["spot_radial_mm"])
-    finite_radius = radial_mm if math.isfinite(radial_mm) else 0.0
+    scenarios = (
+        ("Ideal", float(sample.get("ideal_spot_u_mm", u_mm)), float(sample.get("ideal_spot_v_mm", v_mm)), float(sample.get("ideal_spot_radial_mm", radial_mm)), "#16a34a"),
+        ("Con error", float(sample.get("error_spot_u_mm", u_mm)), float(sample.get("error_spot_v_mm", v_mm)), float(sample.get("error_spot_radial_mm", radial_mm)), "#ef4444"),
+        ("Corregido", float(sample.get("corrected_spot_u_mm", u_mm)), float(sample.get("corrected_spot_v_mm", v_mm)), float(sample.get("corrected_spot_radial_mm", radial_mm)), "#2563eb"),
+    )
+    finite_radius = max((item[3] for item in scenarios if math.isfinite(item[3])), default=0.0)
     half_range = max(100.0, tolerance_mm * 4.0, finite_radius * 1.20)
     left, top, size = 95.0, 58.0, 410.0
     center_x, center_y = left + size / 2.0, top + size / 2.0
@@ -239,14 +403,16 @@ def spot_svg(sample: dict[str, object], history: list[dict[str, object]], tolera
         if math.isfinite(item_u) and math.isfinite(item_v):
             x, y = map_point(item_u, item_v)
             trail_points.append(f"{x:.1f},{y:.1f}")
-    marker = ""
-    if valid and math.isfinite(u_mm) and math.isfinite(v_mm):
-        marker_x, marker_y = map_point(u_mm, v_mm)
-        marker = (
-            f'<circle cx="{marker_x:.1f}" cy="{marker_y:.1f}" r="10" fill="#ef4444" '
-            'stroke="#ffffff" stroke-width="3"/><circle '
-            f'cx="{marker_x:.1f}" cy="{marker_y:.1f}" r="19" fill="none" stroke="#ef4444" stroke-width="2"/>'
+    markers: list[str] = []
+    for label, scenario_u, scenario_v, _scenario_r, color in scenarios:
+        if not (math.isfinite(scenario_u) and math.isfinite(scenario_v)):
+            continue
+        marker_x, marker_y = map_point(scenario_u, scenario_v)
+        markers.append(
+            f'<circle cx="{marker_x:.1f}" cy="{marker_y:.1f}" r="9" fill="{color}" '
+            f'stroke="#ffffff" stroke-width="3"><title>{html.escape(label)}</title></circle>'
         )
+    marker = "".join(markers)
     tolerance_px = tolerance_mm / half_range * size / 2.0
     grid = []
     for tick in range(-4, 5):
@@ -266,14 +432,17 @@ def spot_svg(sample: dict[str, object], history: list[dict[str, object]], tolera
     <text x="{center_x}" y="{top+size+34}" text-anchor="middle" fill="#334155" font-size="13">u [mm] · oeste positivo · rango ±{half_range:.1f}</text>
     <text x="34" y="{center_y}" transform="rotate(-90 34 {center_y})" text-anchor="middle" fill="#334155" font-size="13">v [mm] · cenit positivo</text>
     <g transform="translate(560 70)">
-      <rect width="395" height="325" rx="14" fill="#ffffff" stroke="#cad5df"/>
+      <rect width="395" height="380" rx="14" fill="#ffffff" stroke="#cad5df"/>
       <text x="24" y="42" fill="#102a43" font-size="21" font-weight="700">Lectura actual</text>
       <text x="24" y="84" fill="#334155" font-size="16">Horizontal u</text><text x="365" y="84" text-anchor="end" fill="#0f4c5c" font-size="18" font-weight="700">{number(u_mm)} mm</text>
       <text x="24" y="120" fill="#334155" font-size="16">Vertical v</text><text x="365" y="120" text-anchor="end" fill="#0f4c5c" font-size="18" font-weight="700">{number(v_mm)} mm</text>
       <text x="24" y="156" fill="#334155" font-size="16">Error radial</text><text x="365" y="156" text-anchor="end" fill="#dc2626" font-size="18" font-weight="700">{number(radial_mm)} mm</text>
       <text x="24" y="192" fill="#334155" font-size="16">Tolerancia</text><text x="365" y="192" text-anchor="end" fill="#16834f" font-size="18" font-weight="700">{tolerance_mm:.2f} mm</text>
-      <rect x="24" y="226" width="341" height="52" rx="8" fill="{'#16834f' if valid and radial_mm <= tolerance_mm else '#b42318'}"/>
-      <text x="194" y="259" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">{html.escape(str(sample['status']))}</text>
+      <text x="24" y="224" fill="#16a34a" font-size="15" font-weight="700">Ideal</text><text x="365" y="224" text-anchor="end" fill="#16a34a" font-size="15">{number(scenarios[0][3])} mm</text>
+      <text x="24" y="252" fill="#ef4444" font-size="15" font-weight="700">Con error</text><text x="365" y="252" text-anchor="end" fill="#ef4444" font-size="15">{number(scenarios[1][3])} mm</text>
+      <text x="24" y="280" fill="#2563eb" font-size="15" font-weight="700">Corregido</text><text x="365" y="280" text-anchor="end" fill="#2563eb" font-size="15">{number(scenarios[2][3])} mm</text>
+      <rect x="24" y="306" width="341" height="48" rx="8" fill="{'#16834f' if valid and radial_mm <= tolerance_mm else '#b42318'}"/>
+      <text x="194" y="336" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700">{html.escape(str(sample['status']))}</text>
     </g>
     """
     return svg_document(content)
@@ -833,7 +1002,7 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.3.7"),
+            ui.strong("Versión web 0.4.0"),
             ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
@@ -915,7 +1084,7 @@ def csv_guide_panel() -> object:
             ),
             ui.span("→", class_="csv-flow-arrow"),
             ui.div(
-                ui.span("49 DATOS", class_="csv-flow-badge"),
+                ui.span("166 DATOS", class_="csv-flow-badge"),
                 ui.strong("Estado completo de la muestra"),
                 ui.span("tiempo · seguimiento · spot · geometría"),
                 class_="csv-flow-step",
@@ -939,7 +1108,7 @@ def csv_guide_panel() -> object:
             ),
             ui.div(
                 ui.strong("Ejemplo simplificado"),
-                ui.p("El archivo real contiene 49 columnas. Cada fila es una fotografía numérica del simulador en ese instante; no es una imagen."),
+                ui.p("El archivo real contiene 166 columnas documentadas. Cada fila es una fotografía numérica del simulador en ese instante; no es una imagen."),
                 ui.div(ui.span("SIN HISTORIAL"), ui.span("Se exporta la lectura actual como una sola fila."), class_="csv-single-row-note"),
                 class_="csv-table-caption",
             ),
@@ -972,7 +1141,12 @@ def csv_guide_panel() -> object:
         ),
         ui.div(
             ui.strong("El CSV no guarda"),
-            ui.span("gráficas o capturas · escena 3D · vectores completos S/N/reflejado/target · celdas del mapa de intensidad · resultados por faceta · latitud/longitud/UTC/método solar · RX/RY/RZ · PWM/velocidades · offsets/derivas/ganancia"),
+            ui.span("gráficas o capturas · la malla de la escena 3D · cada celda individual del mapa · cada rayo individual por faceta · la bitácora de eventos"),
+            class_="csv-not-included",
+        ),
+        ui.div(
+            ui.strong("EXPORTAR PAQUETE"),
+            ui.span("crea un ZIP con historial.csv, facetas.csv, eventos.csv y un archivo LEEME. Es la opción recomendada para conservar un experimento completo."),
             class_="csv-not-included",
         ),
         class_="csv-guide-panel",
@@ -1270,8 +1444,8 @@ def visual_guide_panel() -> object:
         ui.div(
             manual_chapter(
                 "Operación, reloj y modos",
-                ui.p("INICIAR comienza una sesión. PAUSAR congela reloj y movimiento. REANUDAR continúa la misma sesión. VOLVER A CONFIGURAR detiene la sesión, devuelve el heliostato a 0°/90° y conserva los valores escritos."),
-                ui.p("Tiempo real usa la hora civil del equipo. Fecha simulada usa el día, hora, zona UTC y multiplicador elegidos. Automático sigue el objetivo; Manual usa Oeste/Este y Bajar/Subir; Home regresa gradualmente a AZ 0° y EL 90°. PWM multiplica la velocidad máxima."),
+                ui.p("INICIAR comienza una sesión. PAUSAR congela reloj y movimiento. REANUDAR continúa la misma sesión. VOLVER A CONFIGURAR detiene la sesión y devuelve el heliostato a 0°/90°. REPRODUCIR recorre las muestras guardadas sin generar datos nuevos."),
+                ui.p("Tiempo real usa la hora civil del equipo. Fecha simulada usa el día, hora, zona UTC y multiplicador elegidos; estando pausada permite avanzar un paso exacto o reiniciar el reloj. Automático captura el objetivo cada 1, 5, 10, 30 o 60 segundos solares, o únicamente bajo orden."),
             ),
             manual_chapter(
                 "Calibración, geometría y cámara 3D",
@@ -1280,13 +1454,15 @@ def visual_guide_panel() -> object:
             ),
             manual_chapter(
                 "Spot, facetas, intensidad y corrección",
-                ui.p("En el receptor, u es horizontal hacia el oeste, v vertical hacia el cenit y r la distancia radial. El círculo verde representa la tolerancia."),
+                ui.p("En el receptor, u es horizontal hacia el oeste, v vertical hacia el cenit y r la distancia radial. Verde representa Ideal, rojo Con error y azul Corregido; el círculo verde punteado es la tolerancia."),
                 ui.p("Forma admite cuadrada, circular y hexagonal. Cantidad crea un acomodo compacto. Tamaño significa lado, diámetro o ancho entre caras. Puedes desalinear o desactivar una faceta y comparar su impacto en el mapa."),
-                ui.p("Offset es fijo; deriva crece por hora del experimento. CORREGIR AHORA aplica la ganancia al error restante y converge progresivamente."),
+                ui.p("Las fuentes de error pueden habilitarse por separado: offsets, desalineación, posiciones XYZ, peralte, backlash, sentido de movimiento y ruido con semilla. La corrección admite offset constante, dependencia temporal, polinomio, impacto observado y cámara periódica."),
+                ui.p("Deriva y corrección reúne seis gráficas. Haz clic en cualquiera para ampliarla y usa Vista de 6 gráficas para regresar al resumen."),
             ),
             manual_chapter(
                 "Diagnóstico, CSV y solución de problemas",
-                ui.p("Diagnóstico muestra error AZ/EL, error del spot, altura solar, incidencia, diferencia reflejado-target, correcciones y vectores. EXPORTAR HISTORIAL CSV descarga hasta 1,200 muestras; si no existe historial, descarga únicamente la lectura actual."),
+                ui.p("Diagnóstico muestra error AZ/EL, comparación de escenarios, estadística del seguimiento, encoders, correcciones y vectores. EXPORTAR HISTORIAL CSV descarga hasta 1,200 muestras con 166 columnas; si no existe historial, descarga únicamente la lectura actual."),
+                ui.p("Eventos conserva una bitácora de inicio, pausas, cambios de modo, actualizaciones del objetivo, correcciones, reloj y replay. Limpiar historial no altera la calibración; limpiar bitácora inicia un registro nuevo."),
                 ui.tags.ul(
                     ui.tags.li("Sin movimiento: inicia la sesión y revisa modo, PWM y límites."),
                     ui.tags.li("Sin spot: confirma que el Sol esté sobre el horizonte y exista intersección frontal."),
@@ -1349,6 +1525,20 @@ def drift_panel() -> object:
     return ui.div(
         ui.div(
             ui.output_ui("correction_readout"),
+            ui.input_select(
+                "drift_display",
+                "Grafica mostrada",
+                choices={
+                    "overview": "Vista de 6 graficas",
+                    "az_error": "Error de acimut",
+                    "el_error": "Error de elevacion",
+                    "az_correction": "Correccion de acimut",
+                    "el_correction": "Correccion de elevacion",
+                    "error_spot": "Spot con error",
+                    "corrected_spot": "Spot corregido",
+                },
+                selected="overview",
+            ),
             ui.input_action_button(
                 "correct_now",
                 "CORREGIR DESDE IMPACTO",
@@ -1361,11 +1551,9 @@ def drift_panel() -> object:
     )
 
 
-def drift_svg(state: WebTwinState) -> str:
+def drift_svg(state: WebTwinState, display: str = "overview") -> str:
     samples = (state.history or [state.snapshot()])[-180:]
-    width, height = 1000, 520
-    left, right = 78.0, 966.0
-    panels = ((65.0, 225.0, "Error angular respecto al objetivo [deg]"), (300.0, 460.0, "Error radial del spot [mm]"))
+    width, height = 1000, 600
 
     def finite(value: object) -> float:
         try:
@@ -1374,43 +1562,65 @@ def drift_svg(state: WebTwinState) -> str:
             return 0.0
         return result if math.isfinite(result) else 0.0
 
-    angular = [math.hypot(finite(item.get("az_error_deg")), finite(item.get("el_error_deg"))) for item in samples]
-    radial = [finite(item.get("spot_radial_mm")) for item in samples]
+    series = {
+        "az_error": ("Error de acimut", "deg", "#178ca4", [finite(item.get("effective_az_error_deg")) for item in samples]),
+        "el_error": ("Error de elevacion", "deg", "#8b5cf6", [finite(item.get("effective_el_error_deg")) for item in samples]),
+        "az_correction": ("Correccion de acimut", "deg", "#2563eb", [finite(item.get("correction_az_deg")) for item in samples]),
+        "el_correction": ("Correccion de elevacion", "deg", "#0f766e", [finite(item.get("correction_el_deg")) for item in samples]),
+        "error_spot": ("Spot con error", "mm", "#dc2626", [finite(item.get("error_spot_radial_mm")) for item in samples]),
+        "corrected_spot": ("Spot corregido", "mm", "#16a34a", [finite(item.get("corrected_spot_radial_mm")) for item in samples]),
+    }
 
-    def plot(values: list[float], top: float, bottom: float, color: str) -> tuple[str, float]:
-        maximum = max(max(values, default=0.0), 0.001)
+    def plot(values: list[float], left: float, right: float, top: float, bottom: float) -> tuple[str, float, float, float | None]:
+        minimum = min(values, default=0.0)
+        maximum = max(values, default=0.0)
+        if abs(maximum - minimum) < 1e-9:
+            padding = max(0.001, abs(maximum) * 0.15)
+            minimum -= padding
+            maximum += padding
         points = []
         denominator = max(1, len(values) - 1)
         for index, value in enumerate(values):
             x = left + (right - left) * index / denominator
-            y = bottom - (bottom - top) * max(0.0, value) / maximum
+            y = bottom - (bottom - top) * (value - minimum) / (maximum - minimum)
             points.append(f"{x:.1f},{y:.1f}")
-        return " ".join(points), maximum
+        zero_y = None
+        if minimum <= 0.0 <= maximum:
+            zero_y = bottom - (bottom - top) * (0.0 - minimum) / (maximum - minimum)
+        return " ".join(points), minimum, maximum, zero_y
 
-    angular_points, angular_max = plot(angular, panels[0][0], panels[0][1], "#178ca4")
-    radial_points, radial_max = plot(radial, panels[1][0], panels[1][1], "#c43131")
     content: list[str] = [
-        '<rect width="1000" height="520" fill="#f8fafc"/>',
-        '<text x="28" y="34" fill="#102a43" font-size="20" font-weight="700">Deriva temporal y correccion observada</text>',
+        '<rect width="1000" height="600" fill="#f8fafc"/>',
+        '<text x="28" y="34" fill="#102a43" font-size="20" font-weight="700">Deriva temporal, escenarios y correccion</text>',
     ]
-    for (top, bottom, label), maximum, points, color in zip(
-        panels,
-        (angular_max, radial_max),
-        (angular_points, radial_points),
-        ("#178ca4", "#c43131"),
-    ):
+    if display in series:
+        layouts = [(display, 78.0, 966.0, 82.0, 520.0)]
+    else:
+        layouts = []
+        for index, key in enumerate(series):
+            column = index % 2
+            row = index // 2
+            left = 62.0 + column * 472.0
+            layouts.append((key, left, left + 410.0, 68.0 + row * 172.0, 198.0 + row * 172.0))
+
+    for key, left, right, top, bottom in layouts:
+        label, unit, color, values = series[key]
+        points, minimum, maximum, zero_y = plot(values, left, right, top, bottom)
+        click = f"if(window.Shiny) Shiny.setInputValue('drift_chart_pick','{key}',{{priority:'event'}})"
         content.extend(
             [
-                f'<rect x="{left}" y="{top}" width="{right-left}" height="{bottom-top}" fill="#ffffff" stroke="#cbd5df"/>',
-                f'<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#64748b"/>',
-                f'<line x1="{left}" y1="{top}" x2="{left}" y2="{bottom}" stroke="#64748b"/>',
-                f'<text x="{left}" y="{top-10}" fill="#334155" font-size="14" font-weight="700">{label}</text>',
-                f'<text x="{left-10}" y="{top+5}" text-anchor="end" fill="#64748b" font-size="12">{maximum:.3f}</text>',
-                f'<text x="{left-10}" y="{bottom+4}" text-anchor="end" fill="#64748b" font-size="12">0</text>',
+                f'<g onclick="{click}" style="cursor:pointer">',
+                f'<rect x="{left}" y="{top}" width="{right-left}" height="{bottom-top}" rx="7" fill="#ffffff" stroke="#cbd5df"/>',
+                f'<text x="{left+8}" y="{top+19}" fill="#334155" font-size="13" font-weight="700">{label} [{unit}]</text>',
+                f'<text x="{left-7}" y="{top+5}" text-anchor="end" fill="#64748b" font-size="11">{maximum:.3f}</text>',
+                f'<text x="{left-7}" y="{bottom+4}" text-anchor="end" fill="#64748b" font-size="11">{minimum:.3f}</text>',
+                (f'<line x1="{left}" y1="{zero_y:.1f}" x2="{right}" y2="{zero_y:.1f}" stroke="#cbd5df" stroke-dasharray="4 4"/>' if zero_y is not None else ""),
                 f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="3"/>',
+                '</g>',
             ]
         )
-    content.append(f'<text x="{(left+right)/2}" y="500" text-anchor="middle" fill="#64748b" font-size="13">Muestras en orden temporal · {len(samples)} visibles</text>')
+    hint = "Haz clic en una grafica para ampliarla" if display not in series else "Selecciona Vista de 6 graficas para regresar"
+    content.append(f'<text x="500" y="578" text-anchor="middle" fill="#64748b" font-size="13">{hint} · X = muestras en orden temporal · {len(samples)} visibles</text>')
     return svg_document("".join(content), width, height)
 
 
@@ -1426,7 +1636,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.7"),
+            ui.h1("Mini horno solar · Web 0.4.0"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),
@@ -1447,7 +1657,14 @@ app_ui = ui.page_fluid(
                 ui.panel_conditional(
                     "input.mode === 'Automatico'",
                     ui.input_checkbox("tracking", "Seguimiento solar", True),
-                    ui.p("El objetivo solar se actualiza continuamente mientras la sesion esta activa.", class_="field-help"),
+                    ui.input_select(
+                        "tracking_interval",
+                        "Actualizar objetivo solar",
+                        choices={"1": "Cada 1 s solar", "5": "Cada 5 s solares", "10": "Cada 10 s solares", "30": "Cada 30 s solares", "60": "Cada 60 s solares", "manual": "Solo bajo orden"},
+                        selected="1",
+                    ),
+                    ui.input_action_button("tracking_now", "ACTUALIZAR OBJETIVO AHORA", class_="secondary-action full"),
+                    ui.p("Entre actualizaciones, el objetivo queda retenido y los motores llegan gradualmente.", class_="field-help"),
                 ),
                 ui.panel_conditional(
                     "input.mode === 'Manual'",
@@ -1483,6 +1700,13 @@ app_ui = ui.page_fluid(
                 ui.input_text("sim_time", "Hora", value="12:00:00"),
                 ui.input_select("time_scale", "Velocidad", choices=("1", "10", "60", "120", "600"), selected="60"),
                 ui.input_action_button("apply_time", "APLICAR FECHA Y HORA", class_="secondary-action full"),
+                ui.input_numeric("simulation_step", "Paso manual [s]", value=60, min=0, max=86400, step=1),
+                ui.div(
+                    ui.input_action_button("step_time", "AVANZAR UN PASO", class_="secondary-action"),
+                    ui.input_action_button("reset_time", "REINICIAR RELOJ", class_="secondary-action"),
+                    class_="two-columns",
+                ),
+                ui.p("El paso manual solo actua con Fecha simulada y la sesion pausada.", class_="field-help"),
                 opened=True,
             ),
             control_section(
@@ -1524,11 +1748,37 @@ app_ui = ui.page_fluid(
                     ui.input_numeric("target_tolerance", "Tolerancia [m]", value=MINIHORNO_WEB_PROFILE["target_tolerance_m"], min=0.0001, step=0.001),
                     class_="two-columns",
                 ),
+                ui.div(
+                    ui.input_numeric("peralte", "Peralte [deg]", value=MINIHORNO_WEB_PROFILE["peralte_deg"], step=0.01),
+                    ui.input_numeric("cdr", "Banda muerta CDR [deg]", value=MINIHORNO_WEB_PROFILE["cdr_deg"], min=0, step=0.01),
+                    class_="two-columns",
+                ),
+                ui.div(
+                    ui.input_numeric("camera_offset_az", "Offset camara AZ [deg]", value=0.0, step=0.01),
+                    ui.input_numeric("camera_offset_el", "Offset camara EL [deg]", value=0.0, step=0.01),
+                    class_="two-columns",
+                ),
+                ui.div(
+                    ui.input_numeric("az_limit_min", "Limite AZ min [deg]", value=MINIHORNO_WEB_PROFILE["az_limit_min"], step=1),
+                    ui.input_numeric("az_limit_max", "Limite AZ max [deg]", value=MINIHORNO_WEB_PROFILE["az_limit_max"], step=1),
+                    class_="two-columns",
+                ),
+                ui.div(
+                    ui.input_numeric("el_limit_min", "Limite EL min [deg]", value=MINIHORNO_WEB_PROFILE["el_limit_min"], step=1),
+                    ui.input_numeric("el_limit_max", "Limite EL max [deg]", value=MINIHORNO_WEB_PROFILE["el_limit_max"], step=1),
+                    class_="two-columns",
+                ),
                 ui.p("RX, RY y RZ se miden desde el centro optico del espejo.", class_="field-help"),
                 opened=True,
             ),
             control_section(
                 "Motores, errores y correccion",
+                ui.input_select("error_mode", "Escenario mostrado", choices=("Ideal", "Con error", "Corregido"), selected="Corregido"),
+                ui.div(
+                    ui.input_checkbox("az_motor_on", "Motor AZ habilitado", True),
+                    ui.input_checkbox("el_motor_on", "Motor EL habilitado", True),
+                    class_="two-columns",
+                ),
                 ui.input_slider("az_pwm", "PWM acimut", min=0, max=100, value=55, step=1, post=" %"),
                 ui.input_slider("el_pwm", "PWM elevacion", min=0, max=100, value=55, step=1, post=" %"),
                 ui.div(
@@ -1537,16 +1787,100 @@ app_ui = ui.page_fluid(
                     class_="two-columns",
                 ),
                 ui.div(
-                    ui.input_numeric("az_offset", "Offset AZ [deg]", value=0.0, step=0.01),
-                    ui.input_numeric("el_offset", "Offset EL [deg]", value=0.0, step=0.01),
+                    ui.input_numeric("az_counts", "Encoder AZ [conteos/deg]", value=MINIHORNO_WEB_PROFILE["az_counts_per_degree"], min=0, step=1),
+                    ui.input_numeric("el_counts", "Encoder EL [conteos/deg]", value=MINIHORNO_WEB_PROFILE["el_counts_per_degree"], min=0, step=1),
                     class_="two-columns",
+                ),
+                ui.tags.details(
+                    ui.tags.summary("Errores geometricos y mecanicos"),
+                    ui.input_checkbox("enable_az_offset", "Offset de acimut", False),
+                    ui.input_numeric("az_offset", "Offset AZ [deg]", value=0.0, step=0.01),
+                    ui.input_checkbox("enable_el_offset", "Offset de elevacion", False),
+                    ui.input_numeric("el_offset", "Offset EL [deg]", value=0.0, step=0.01),
+                    ui.input_checkbox("enable_ns_error", "Desalineacion norte-sur", False),
+                    ui.input_numeric("ns_error", "Desalineacion N-S [deg]", value=0.0, step=0.01),
+                    ui.input_checkbox("enable_target_xyz", "Error de posicion del receptor", False),
+                    ui.div(
+                        ui.input_numeric("target_error_x", "Target dX [m]", value=0.0, step=0.001),
+                        ui.input_numeric("target_error_y", "Target dY [m]", value=0.0, step=0.001),
+                        ui.input_numeric("target_error_z", "Target dZ [m]", value=0.0, step=0.001),
+                        class_="three-columns",
+                    ),
+                    ui.input_checkbox("enable_heliostat_xyz", "Error de posicion del heliostato", False),
+                    ui.div(
+                        ui.input_numeric("heliostat_error_x", "Heliostato dX [m]", value=0.0, step=0.001),
+                        ui.input_numeric("heliostat_error_y", "Heliostato dY [m]", value=0.0, step=0.001),
+                        ui.input_numeric("heliostat_error_z", "Heliostato dZ [m]", value=0.0, step=0.001),
+                        class_="three-columns",
+                    ),
+                    ui.input_checkbox("enable_peralte_error", "Error de peralte", False),
+                    ui.input_numeric("peralte_error", "Error peralte [deg]", value=0.0, step=0.01),
+                    ui.input_checkbox("enable_backlash", "Backlash", False),
+                    ui.input_numeric("backlash", "Backlash [deg]", value=0.0, min=0, step=0.01),
+                    ui.input_checkbox("enable_directional", "Error diferente al subir y bajar", False),
+                    ui.div(
+                        ui.input_numeric("upward_error", "Subida [deg]", value=0.0, step=0.01),
+                        ui.input_numeric("downward_error", "Bajada [deg]", value=0.0, step=0.01),
+                        class_="two-columns",
+                    ),
+                    ui.input_checkbox("enable_noise", "Ruido aleatorio reproducible", False),
+                    ui.div(
+                        ui.input_numeric("noise_std", "Sigma ruido [deg]", value=0.0, min=0, step=0.001),
+                        ui.input_numeric("noise_seed", "Semilla", value=12345, step=1),
+                        class_="two-columns",
+                    ),
+                    class_="nested-controls",
                 ),
                 ui.div(
                     ui.input_numeric("drift_az", "Deriva AZ [deg/h]", value=0.0, step=0.01),
                     ui.input_numeric("drift_el", "Deriva EL [deg/h]", value=0.0, step=0.01),
                     class_="two-columns",
                 ),
-                ui.input_slider("correction_gain", "Ganancia de correccion", min=0, max=100, value=50, step=5, post=" %"),
+                ui.tags.details(
+                    ui.tags.summary("Estrategia de correccion"),
+                    ui.input_checkbox("correction_enabled", "Activar correccion", False),
+                    ui.input_select("correction_strategy", "Estrategia", choices=("Ninguna", "Offset constante", "Dependiente del tiempo", "Polinomial", "Impacto observado", "Camara periodica"), selected="Ninguna"),
+                    ui.div(
+                        ui.input_numeric("correction_constant_az", "Constante AZ [deg]", value=0.0, step=0.01),
+                        ui.input_numeric("correction_constant_el", "Constante EL [deg]", value=0.0, step=0.01),
+                        class_="two-columns",
+                    ),
+                    ui.div(
+                        ui.input_numeric("correction_rate_az", "Tasa AZ [deg/h]", value=0.0, step=0.01),
+                        ui.input_numeric("correction_rate_el", "Tasa EL [deg/h]", value=0.0, step=0.01),
+                        class_="two-columns",
+                    ),
+                    ui.strong("Polinomio c0 + c1*t + c2*t^2 (t en horas)"),
+                    ui.div(
+                        ui.input_numeric("poly_az_c0", "AZ c0", value=0.0, step=0.01),
+                        ui.input_numeric("poly_az_c1", "AZ c1", value=0.0, step=0.01),
+                        ui.input_numeric("poly_az_c2", "AZ c2", value=0.0, step=0.01),
+                        class_="three-columns",
+                    ),
+                    ui.div(
+                        ui.input_numeric("poly_el_c0", "EL c0", value=0.0, step=0.01),
+                        ui.input_numeric("poly_el_c1", "EL c1", value=0.0, step=0.01),
+                        ui.input_numeric("poly_el_c2", "EL c2", value=0.0, step=0.01),
+                        class_="three-columns",
+                    ),
+                    ui.input_slider("correction_gain", "Ganancia desde impacto", min=0, max=100, value=50, step=5, post=" %"),
+                    ui.div(
+                        ui.input_numeric("correction_max_step", "Paso maximo [deg]", value=1.0, min=0, step=0.05),
+                        ui.input_numeric("camera_interval", "Intervalo camara [s]", value=60.0, min=0.001, step=1),
+                        class_="two-columns",
+                    ),
+                    ui.input_action_button("reset_correction", "REINICIAR CORRECCION", class_="secondary-action full"),
+                    class_="nested-controls",
+                ),
+            ),
+            control_section(
+                "Vectores y referencias 3D",
+                ui.input_checkbox("show_sun", "Solar incidente", True),
+                ui.input_checkbox("show_normal", "Normal del heliostato", True),
+                ui.input_checkbox("show_reflected", "Rayo reflejado", True),
+                ui.input_checkbox("show_target_direction", "Direccion objetivo", True),
+                ui.input_checkbox("show_target_line", "Linea heliostato-target", True),
+                ui.input_checkbox("show_guides", "Guias mecanicas", False),
             ),
             control_section(
                 "Facetas: geometria, rayos e intensidad",
@@ -1614,7 +1948,9 @@ app_ui = ui.page_fluid(
                 ui.div(
                     ui.input_action_button("toggle_run", "INICIAR SIMULACION", class_="primary-action"),
                     ui.input_action_button("reset", "VOLVER A CONFIGURAR", class_="secondary-action"),
+                    ui.input_action_button("toggle_replay", "REPRODUCIR", class_="secondary-action"),
                     ui.download_button("download_csv", "EXPORTAR HISTORIAL CSV", class_="secondary-action csv-download-action"),
+                    ui.download_button("download_package", "EXPORTAR PAQUETE", class_="secondary-action csv-download-action"),
                     class_="action-row",
                 ),
                 class_="operation-row",
@@ -1627,6 +1963,18 @@ app_ui = ui.page_fluid(
                     ui.nav_panel("Facetas", ui.output_ui("facet_view")),
                     ui.nav_panel("Deriva y correccion", drift_panel()),
                     ui.nav_panel("Diagnostico", ui.output_ui("diagnostic_view")),
+                    ui.nav_panel(
+                        "Eventos",
+                        ui.div(
+                            ui.div(
+                                ui.input_action_button("clear_history", "LIMPIAR HISTORIAL", class_="secondary-action"),
+                                ui.input_action_button("clear_events", "LIMPIAR BITACORA", class_="secondary-action"),
+                                class_="event-actions",
+                            ),
+                            ui.output_ui("events_view"),
+                            class_="events-panel",
+                        ),
+                    ),
                     ui.nav_panel("Manual", manual_panel()),
                     id="main_view",
                 ),
@@ -1653,12 +2001,23 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
     @reactive.effect
     def sync_controls() -> None:
         selected_mode = str(input.mode())
-        if selected_mode != state.mode and selected_mode == "Manual":
-            state.stop_manual_motion()
+        if selected_mode != state.mode:
+            if selected_mode == "Manual":
+                state.stop_manual_motion()
+            if selected_mode == "Automatico":
+                state.reset_tracking_schedule()
+            if selected_mode == "Home":
+                state.resample_motion_errors(
+                    -state.az_angle_deg,
+                    90.0 - state.el_angle_deg,
+                )
+            state.add_event("Modo", f"Modo seleccionado: {selected_mode}")
         state.mode = selected_mode
         state.tracking = bool(input.tracking())
+        state.configure_tracking_updates(str(input.tracking_interval()))
         state.time_mode = str(input.time_mode())
         state.time_scale = float(input.time_scale())
+        state.simulation_step_s = float(input.simulation_step())
         state.lat_deg = float(input.lat())
         state.lon_deg = float(input.lon())
         state.utc_offset_hours = float(input.utc())
@@ -1671,16 +2030,75 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
         state.rail_length_m = float(input.rail_length())
         state.receiver_screen_m = float(input.receiver_screen())
         state.target_tolerance_m = float(input.target_tolerance())
+        state.peralte_deg = float(input.peralte())
+        state.cdr_deg = max(0.0, float(input.cdr()))
+        state.camera_offset_az_deg = float(input.camera_offset_az())
+        state.camera_offset_el_deg = float(input.camera_offset_el())
+        state.az_limit_min = float(input.az_limit_min())
+        state.az_limit_max = float(input.az_limit_max())
+        state.el_limit_min = float(input.el_limit_min())
+        state.el_limit_max = float(input.el_limit_max())
         state.method = str(input.method())
+        state.error_mode = str(input.error_mode())
+        state.az_motor_on = bool(input.az_motor_on())
+        state.el_motor_on = bool(input.el_motor_on())
         state.az_pwm = float(input.az_pwm()) / 100.0
         state.el_pwm = float(input.el_pwm()) / 100.0
         state.az_deg_per_second = float(input.az_speed())
         state.el_deg_per_second = float(input.el_speed())
+        state.az_counts_per_degree = max(0.0, float(input.az_counts()))
+        state.el_counts_per_degree = max(0.0, float(input.el_counts()))
         state.az_offset_deg = float(input.az_offset())
         state.el_offset_deg = float(input.el_offset())
+        error = state.error_config
+        error.enable_azimuth_offset = bool(input.enable_az_offset())
+        error.azimuth_offset_deg = state.az_offset_deg
+        error.enable_elevation_offset = bool(input.enable_el_offset())
+        error.elevation_offset_deg = state.el_offset_deg
+        error.enable_north_south_misalignment = bool(input.enable_ns_error())
+        error.north_south_misalignment_deg = float(input.ns_error())
+        error.enable_target_position_error = bool(input.enable_target_xyz())
+        error.target_error_x_m = float(input.target_error_x())
+        error.target_error_y_m = float(input.target_error_y())
+        error.target_error_z_m = float(input.target_error_z())
+        error.enable_heliostat_position_error = bool(input.enable_heliostat_xyz())
+        error.heliostat_error_x_m = float(input.heliostat_error_x())
+        error.heliostat_error_y_m = float(input.heliostat_error_y())
+        error.heliostat_error_z_m = float(input.heliostat_error_z())
+        error.enable_peralte_error = bool(input.enable_peralte_error())
+        error.peralte_error_deg = float(input.peralte_error())
+        error.enable_backlash = bool(input.enable_backlash())
+        error.backlash_deg = max(0.0, float(input.backlash()))
+        error.enable_directional_error = bool(input.enable_directional())
+        error.upward_error_deg = float(input.upward_error())
+        error.downward_error_deg = float(input.downward_error())
+        error.enable_random_noise = bool(input.enable_noise())
+        error.random_noise_std_deg = max(0.0, float(input.noise_std()))
+        error.random_seed = int(input.noise_seed())
         state.drift_az_deg_per_hour = float(input.drift_az())
         state.drift_el_deg_per_hour = float(input.drift_el())
         state.correction_gain = float(input.correction_gain()) / 100.0
+        correction = state.correction_config
+        correction.enabled = bool(input.correction_enabled())
+        correction.strategy = str(input.correction_strategy())
+        correction.constant_az_deg = float(input.correction_constant_az())
+        correction.constant_el_deg = float(input.correction_constant_el())
+        correction.time_az_rate_deg_per_hour = float(input.correction_rate_az())
+        correction.time_el_rate_deg_per_hour = float(input.correction_rate_el())
+        correction.polynomial_az_c0 = float(input.poly_az_c0())
+        correction.polynomial_az_c1 = float(input.poly_az_c1())
+        correction.polynomial_az_c2 = float(input.poly_az_c2())
+        correction.polynomial_el_c0 = float(input.poly_el_c0())
+        correction.polynomial_el_c1 = float(input.poly_el_c1())
+        correction.polynomial_el_c2 = float(input.poly_el_c2())
+        correction.image_max_step_deg = max(0.0, float(input.correction_max_step()))
+        correction.camera_interval_s = max(0.001, float(input.camera_interval()))
+        state.show_sun_vector = bool(input.show_sun())
+        state.show_normal_vector = bool(input.show_normal())
+        state.show_reflected_vector = bool(input.show_reflected())
+        state.show_target_direction = bool(input.show_target_direction())
+        state.show_target_line = bool(input.show_target_line())
+        state.show_mechanical_guides = bool(input.show_guides())
         state.facet_enabled = bool(input.facet_enabled())
         state.facet_shape = str(input.facet_shape())
         state.facet_count = int(input.facet_count())
@@ -1716,8 +2134,18 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
             "rail_length": "rail_length_m",
             "receiver_screen": "receiver_screen_m",
             "target_tolerance": "target_tolerance_m",
+            "peralte": "peralte_deg",
+            "cdr": "cdr_deg",
+            "camera_offset_az": "camera_offset_az_deg",
+            "camera_offset_el": "camera_offset_el_deg",
+            "az_limit_min": "az_limit_min",
+            "az_limit_max": "az_limit_max",
+            "el_limit_min": "el_limit_min",
+            "el_limit_max": "el_limit_max",
             "az_speed": "az_deg_per_second",
             "el_speed": "el_deg_per_second",
+            "az_counts": "az_counts_per_degree",
+            "el_counts": "el_counts_per_degree",
             "facet_count": "facet_count",
             "facet_size": "facet_size_m",
             "facet_gap": "facet_gap_m",
@@ -1773,6 +2201,52 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
     @reactive.event(input.correct_now)
     def correct_now() -> None:
         state.apply_observed_correction()
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.reset_correction)
+    def reset_correction() -> None:
+        state.reset_correction()
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.tracking_now)
+    def tracking_now() -> None:
+        state.request_tracking_update()
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.step_time)
+    def step_time() -> None:
+        state.step_simulated_time(float(input.simulation_step()))
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.reset_time)
+    def reset_time() -> None:
+        state.reset_simulated_time()
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.toggle_replay)
+    def toggle_replay() -> None:
+        if state.replay_active:
+            state.stop_replay()
+        else:
+            state.start_replay()
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.clear_history)
+    def clear_history() -> None:
+        state.history.clear()
+        state.add_event("Historial", "Muestras eliminadas")
+        bump()
+
+    @reactive.effect
+    @reactive.event(input.clear_events)
+    def clear_events() -> None:
+        state.clear_events()
         bump()
 
     @reactive.effect
@@ -1854,6 +2328,11 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
         else:
             label = "INICIAR SIMULACION"
         ui.update_action_button("toggle_run", label=label, session=session)
+        ui.update_action_button(
+            "toggle_replay",
+            label="SALIR DE REPLAY" if state.replay_active else "REPRODUCIR",
+            session=session,
+        )
 
     @output
     @render.ui
@@ -1941,7 +2420,14 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
     @render.ui
     def drift_chart() -> object:
         revision.get()
-        return ui.HTML(drift_svg(state))
+        return ui.HTML(drift_svg(state, str(input.drift_display())))
+
+    @reactive.effect
+    @reactive.event(input.drift_chart_pick)
+    def drift_chart_pick() -> None:
+        selected = str(input.drift_chart_pick())
+        if selected:
+            ui.update_select("drift_display", selected=selected, session=session)
 
     @output
     @render.ui
@@ -1957,6 +2443,10 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
             ("Reflejado vs target", number(sample["target_difference_deg"], 4), "deg"),
             ("Correccion AZ", number(sample["correction_az_deg"], 4), "deg"),
             ("Correccion EL", number(sample["correction_el_deg"], 4), "deg"),
+            ("Error max. intervalo", number(sample["tracking_error_max_mm"], 3), "mm"),
+            ("Error RMS intervalo", number(sample["tracking_error_rms_mm"], 3), "mm"),
+            ("Encoder AZ", str(sample["az_encoder_counts"]), "conteos"),
+            ("Encoder EL", str(sample["el_encoder_counts"]), "conteos"),
         )
         return ui.div(
             ui.h2("Diagnostico de seguimiento"),
@@ -1981,6 +2471,44 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
                 ),
                 class_="vector-card",
             ),
+            ui.div(
+                ui.h3("Configuracion experimental activa"),
+                ui.p(f"Escenario: {sample['error_mode']} · Errores: {sample['active_errors']}"),
+                ui.p(
+                    f"Correccion: {sample['correction_strategy']} · actualizaciones {sample['correction_update_count']} · "
+                    f"seguimiento {sample['tracking_update_interval_s']} s · capturas {sample['tracking_update_count']}"
+                ),
+                ui.p(
+                    f"Motores AZ {'ON' if sample['az_motor_on'] else 'OFF'} / EL {'ON' if sample['el_motor_on'] else 'OFF'}"
+                ),
+                class_="vector-card",
+            ),
+            class_="diagnostic-panel",
+        )
+
+    @output
+    @render.ui
+    def events_view() -> object:
+        revision.get()
+        recent = list(reversed(state.events[-100:]))
+        if not recent:
+            return ui.div(ui.h2("Eventos y validaciones"), ui.p("No hay eventos registrados."), class_="diagnostic-panel")
+        rows = [
+            ui.tags.tr(
+                ui.tags.td(item["timestamp"]),
+                ui.tags.td(item["category"]),
+                ui.tags.td(item["message"]),
+            )
+            for item in recent
+        ]
+        return ui.div(
+            ui.h2("Eventos y validaciones"),
+            ui.p("La bitacora conserva cambios operativos, correcciones, reloj, replay y actualizaciones de seguimiento."),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(ui.tags.th("Fecha y hora"), ui.tags.th("Tipo"), ui.tags.th("Detalle"))),
+                ui.tags.tbody(*rows),
+                class_="events-table",
+            ),
             class_="diagnostic-panel",
         )
 
@@ -1995,6 +2523,7 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
             ("Impacto u / v", f"{number(sample['spot_u_mm'])} / {number(sample['spot_v_mm'])} mm"),
             ("Error radial", f"{number(sample['spot_radial_mm'])} mm"),
             ("Sol", f"Alt {number(sample['altitude_deg'])}° · Az {number(sample['solar_azimuth_deg'])}°"),
+            ("Escenario", str(sample["error_mode"])),
             ("Muestras", str(len(state.history))),
         )
         return ui.div(
@@ -2006,6 +2535,11 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
     @render.download_button(filename=lambda: f"gemelo_web_{state.active_datetime():%Y%m%d_%H%M%S}.csv")
     def download_csv():  # type: ignore[no-untyped-def]
         yield state.export_csv_text()
+
+    @output
+    @render.download_button(filename=lambda: f"experimento_gemelo_{state.active_datetime():%Y%m%d_%H%M%S}.zip")
+    def download_package():  # type: ignore[no-untyped-def]
+        yield state.export_experiment_zip()
 
 
 app = App(app_ui, server, static_assets=APP_DIR / "www")

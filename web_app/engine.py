@@ -11,6 +11,7 @@ import datetime as dt
 import io
 import math
 import sys
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,8 @@ try:
         contribution_from_ray,
         generate_spot_map,
     )
+    from digital_twin.error_model import ErrorConfig, ErrorModel, MotionErrorSample
+    from digital_twin.correction_model import CorrectionConfig, CorrectionModel
 except ModuleNotFoundError:
     # En desarrollo ``engine.py`` vive en web_app y los modelos son hermanos;
     # en el paquete Shinylive, ``digital_twin`` queda dentro del mismo folder.
@@ -46,12 +49,14 @@ except ModuleNotFoundError:
         contribution_from_ray,
         generate_spot_map,
     )
+    from digital_twin.error_model import ErrorConfig, ErrorModel, MotionErrorSample
+    from digital_twin.correction_model import CorrectionConfig, CorrectionModel
 
 
 TAU = 2.0 * math.pi
 DEG = math.pi / 180.0
 RAD = 180.0 / math.pi
-WEB_APP_VERSION = "0.3.7"
+WEB_APP_VERSION = "0.4.0"
 
 
 MINIHORNO_WEB_PROFILE = {
@@ -67,12 +72,19 @@ MINIHORNO_WEB_PROFILE = {
     "rail_length_m": 5.50,
     "receiver_screen_m": 1.60,
     "target_tolerance_m": 0.010,
+    "peralte_deg": 0.40,
+    "cdr_deg": 0.07,
+    "camera_offset_az_deg": 0.0,
+    "camera_offset_el_deg": 0.0,
+    "control_delay_s": 0.05,
     "az_limit_min": -95.0,
     "az_limit_max": 95.0,
     "el_limit_min": 0.0,
     "el_limit_max": 90.0,
     "az_deg_per_second": 9.0,
     "el_deg_per_second": 9.0,
+    "az_counts_per_degree": 280.0,
+    "el_counts_per_degree": 280.0,
     "facet_shape": "Cuadrada",
     "facet_count": 9,
     "facet_size_m": 0.30,
@@ -268,6 +280,15 @@ class WebTwinState:
     az_limit_max: float = MINIHORNO_WEB_PROFILE["az_limit_max"]
     el_limit_min: float = MINIHORNO_WEB_PROFILE["el_limit_min"]
     el_limit_max: float = MINIHORNO_WEB_PROFILE["el_limit_max"]
+    peralte_deg: float = MINIHORNO_WEB_PROFILE["peralte_deg"]
+    cdr_deg: float = MINIHORNO_WEB_PROFILE["cdr_deg"]
+    camera_offset_az_deg: float = MINIHORNO_WEB_PROFILE["camera_offset_az_deg"]
+    camera_offset_el_deg: float = MINIHORNO_WEB_PROFILE["camera_offset_el_deg"]
+    control_delay_s: float = MINIHORNO_WEB_PROFILE["control_delay_s"]
+    az_counts_per_degree: float = MINIHORNO_WEB_PROFILE["az_counts_per_degree"]
+    el_counts_per_degree: float = MINIHORNO_WEB_PROFILE["el_counts_per_degree"]
+    az_motor_on: bool = True
+    el_motor_on: bool = True
     az_pwm: float = 0.55
     el_pwm: float = 0.55
     az_angle_deg: float = 0.0
@@ -281,14 +302,32 @@ class WebTwinState:
     correction_az_deg: float = 0.0
     correction_el_deg: float = 0.0
     correction_gain: float = 0.50
+    error_mode: str = "Corregido"
+    error_config: ErrorConfig = field(default_factory=ErrorConfig)
+    correction_config: CorrectionConfig = field(default_factory=CorrectionConfig)
+    motion_error_sample: MotionErrorSample = field(default_factory=MotionErrorSample)
+    correction_update_count: int = 0
+    correction_pending: bool = False
     mode: str = "Automatico"
     tracking: bool = True
+    tracking_update_interval_s: float = 1.0
+    tracking_updates_manual: bool = False
+    tracking_update_pending: bool = False
+    tracking_schedule_initialized: bool = False
+    seconds_since_tracking_update: float = 0.0
+    tracking_update_count: int = 0
+    tracking_error_max_m: float = 0.0
+    tracking_error_average_m: float = 0.0
+    tracking_error_rms_m: float = 0.0
+    held_target_az_deg: float = 0.0
+    held_target_el_deg: float = 90.0
     running: bool = False
     session_started: bool = False
     time_mode: str = "Tiempo real"
     simulated_time: dt.datetime = field(default_factory=lambda: dt.datetime(2026, 8, 6, 12, 0, 0))
     simulated_start: dt.datetime = field(default_factory=lambda: dt.datetime(2026, 8, 6, 12, 0, 0))
     time_scale: float = 60.0
+    simulation_step_s: float = 60.0
     method: str = "D&B"
     facet_enabled: bool = False
     facet_shape: str = MINIHORNO_WEB_PROFILE["facet_shape"]
@@ -307,13 +346,38 @@ class WebTwinState:
     spot_map_half_size_m: float = 0.050
     spot_map_resolution: int = 51
     spot_normalization: str = "Total = 1"
+    show_sun_vector: bool = True
+    show_normal_vector: bool = True
+    show_reflected_vector: bool = True
+    show_target_direction: bool = True
+    show_target_line: bool = True
+    show_mechanical_guides: bool = False
     iterations: int = 0
     history: list[dict[str, object]] = field(default_factory=list)
+    history_limit: int = 1200
+    events: list[dict[str, str]] = field(default_factory=list)
+    replay_active: bool = False
+    replay_index: int = 0
+    replay_rows: list[dict[str, object]] = field(default_factory=list, repr=False)
     _sample_accumulator_s: float = 0.0
     _elapsed_s: float = 0.0
+    _interval_error_max_m: float = field(default=0.0, repr=False)
+    _interval_error_sum_m: float = field(default=0.0, repr=False)
+    _interval_error_sq_sum_m: float = field(default=0.0, repr=False)
+    _interval_error_samples: int = field(default=0, repr=False)
+    _last_tracking_state: bool = field(default=True, repr=False)
+    _error_model: ErrorModel = field(init=False, repr=False)
+    _correction_model: CorrectionModel = field(init=False, repr=False)
     _facet_previous_count: int = field(default=9, repr=False)
     _facet_cache_key: tuple[object, ...] | None = field(default=None, repr=False)
     _facet_cache: dict[str, object] | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        self._error_model = ErrorModel(self.error_config)
+        self._correction_model = CorrectionModel(self.correction_config)
+        self.held_target_az_deg = self.az_target_deg
+        self.held_target_el_deg = self.el_target_deg
+        self.add_event("Sistema", "Gemelo web listo para configurar")
 
     def apply_profile(self, profile: dict[str, object]) -> None:
         """Aplica de forma segura un perfil geometrico compatible con la web."""
@@ -330,8 +394,15 @@ class WebTwinState:
             "rail_length_m",
             "receiver_screen_m",
             "target_tolerance_m",
+            "peralte_deg",
+            "cdr_deg",
+            "camera_offset_az_deg",
+            "camera_offset_el_deg",
+            "control_delay_s",
             "az_deg_per_second",
             "el_deg_per_second",
+            "az_counts_per_degree",
+            "el_counts_per_degree",
             "az_limit_min",
             "az_limit_max",
             "el_limit_min",
@@ -356,18 +427,23 @@ class WebTwinState:
                 self.az_limit_min,
                 self.az_limit_max,
             )
+            self.motion_error_sample = self._error_model.sample_motion(amount, 0.0)
         elif axis.lower() == "el":
             self.el_target_deg = clamp(
                 self.el_target_deg + amount,
                 self.el_limit_min,
                 self.el_limit_max,
             )
+            self.motion_error_sample = self._error_model.sample_motion(0.0, amount)
         else:
             raise ValueError(f"Eje manual desconocido: {axis}")
 
     def stop_manual_motion(self) -> None:
         self.az_target_deg = self.az_angle_deg
         self.el_target_deg = self.el_angle_deg
+
+    def resample_motion_errors(self, az_delta_deg: float, el_delta_deg: float) -> None:
+        self.motion_error_sample = self._error_model.sample_motion(az_delta_deg, el_delta_deg)
 
     def normalize_facet_selection(self) -> None:
         """Mantiene IDs validos al cambiar la cantidad de facetas."""
@@ -409,14 +485,124 @@ class WebTwinState:
         self._facet_previous_count = count
         self._facet_cache_key = None
 
+    def add_event(self, category: str, message: str) -> None:
+        """Registra una entrada breve y limitada de la bitacora operativa."""
+        self.events.append(
+            {
+                "timestamp": self.active_datetime().isoformat(timespec="seconds"),
+                "category": str(category),
+                "message": str(message),
+            }
+        )
+        if len(self.events) > 250:
+            del self.events[:-250]
+
+    def clear_events(self) -> None:
+        self.events.clear()
+        self.add_event("Sistema", "Bitacora limpiada")
+
+    def configure_tracking_updates(self, value: str | float | None) -> None:
+        """Configura actualizacion automatica o exclusivamente bajo orden."""
+        manual = value is None or str(value).strip().lower() == "manual"
+        interval = self.tracking_update_interval_s if manual else max(0.001, float(value))
+        if manual != self.tracking_updates_manual or abs(interval - self.tracking_update_interval_s) > 1e-12:
+            self.tracking_updates_manual = manual
+            self.tracking_update_interval_s = interval
+            self.reset_tracking_schedule()
+
+    def reset_tracking_schedule(self) -> None:
+        self.seconds_since_tracking_update = 0.0
+        self.tracking_update_count = 0
+        self.tracking_update_pending = False
+        self.tracking_schedule_initialized = False
+        self.held_target_az_deg = self.az_angle_deg
+        self.held_target_el_deg = self.el_angle_deg
+        self.tracking_error_max_m = 0.0
+        self.tracking_error_average_m = 0.0
+        self.tracking_error_rms_m = 0.0
+        self._reset_interval_error_accumulators()
+
+    def request_tracking_update(self) -> None:
+        self.tracking_update_pending = True
+        self.add_event("Seguimiento", "Actualizacion manual solicitada")
+
+    def _reset_interval_error_accumulators(self) -> None:
+        self._interval_error_max_m = 0.0
+        self._interval_error_sum_m = 0.0
+        self._interval_error_sq_sum_m = 0.0
+        self._interval_error_samples = 0
+
+    def _accumulate_tracking_error(self, error_m: float) -> None:
+        if not math.isfinite(error_m):
+            return
+        value = max(0.0, error_m)
+        self._interval_error_max_m = max(self._interval_error_max_m, value)
+        self._interval_error_sum_m += value
+        self._interval_error_sq_sum_m += value * value
+        self._interval_error_samples += 1
+
+    def _finish_tracking_interval(self) -> None:
+        if self._interval_error_samples:
+            count = self._interval_error_samples
+            self.tracking_error_max_m = self._interval_error_max_m
+            self.tracking_error_average_m = self._interval_error_sum_m / count
+            self.tracking_error_rms_m = math.sqrt(self._interval_error_sq_sum_m / count)
+        self._reset_interval_error_accumulators()
+
+    def _apply_tracking_update(self, az_deg: float, el_deg: float) -> None:
+        if self.tracking_schedule_initialized:
+            self._finish_tracking_interval()
+        self.held_target_az_deg = clamp(az_deg, self.az_limit_min, self.az_limit_max)
+        self.held_target_el_deg = clamp(el_deg, self.el_limit_min, self.el_limit_max)
+        self.motion_error_sample = self._error_model.sample_motion(
+            wrap_deg(self.held_target_az_deg - self.az_angle_deg),
+            self.held_target_el_deg - self.el_angle_deg,
+        )
+        self.seconds_since_tracking_update = 0.0
+        self.tracking_update_count += 1
+        self.tracking_update_pending = False
+        self.tracking_schedule_initialized = True
+        self.add_event(
+            "Seguimiento",
+            f"Objetivo actualizado a AZ {self.held_target_az_deg:.3f} deg, EL {self.held_target_el_deg:.3f} deg",
+        )
+
+    def reset_correction(self) -> None:
+        self._correction_model.reset()
+        self.correction_az_deg = 0.0
+        self.correction_el_deg = 0.0
+        self.correction_update_count = 0
+        self.correction_pending = False
+        self.add_event("Correccion", "Compensacion acumulada reiniciada")
+
+    def _update_correction(self, simulated_elapsed_s: float, force: bool = False) -> None:
+        geometry = self._solar_geometry()
+        self.correction_config.image_gain_az = clamp(self.correction_gain, 0.0, 1.0)
+        self.correction_config.image_gain_el = clamp(self.correction_gain, 0.0, 1.0)
+        target = geometry["error_target"]
+        az_deg, el_deg = self._correction_model.update(
+            simulated_elapsed_s=max(0.0, simulated_elapsed_s),
+            observed_u_m=float(geometry["corrected_spot_u_m"]),
+            observed_v_m=float(geometry["corrected_spot_v_m"]),
+            target_distance_m=v_norm(target),
+            observation_trigger=False,
+            force=force,
+        )
+        self.correction_az_deg = az_deg
+        self.correction_el_deg = el_deg
+        self.correction_update_count = self._correction_model.update_count
+        if self._correction_model.corrected_this_step:
+            self.add_event(
+                "Correccion",
+                f"{self.correction_config.strategy}: AZ {az_deg:+.4f} deg, EL {el_deg:+.4f} deg",
+            )
+
     def apply_observed_correction(self) -> None:
-        """Compensa gradualmente el error angular observado."""
-        elapsed_hours = self._elapsed_s / 3600.0
-        effective_az = self.az_offset_deg + self.drift_az_deg_per_hour * elapsed_hours
-        effective_el = self.el_offset_deg + self.drift_el_deg_per_hour * elapsed_hours
-        gain = clamp(self.correction_gain, 0.0, 1.0)
-        self.correction_az_deg += (-effective_az - self.correction_az_deg) * gain
-        self.correction_el_deg += (-effective_el - self.correction_el_deg) * gain
+        """Fuerza una observacion usando la estrategia actualmente elegida."""
+        if self.correction_config.strategy == "Ninguna":
+            self.correction_config.strategy = "Impacto observado"
+        self.correction_config.enabled = True
+        self._update_correction(0.0, force=True)
 
     def active_datetime(self) -> dt.datetime:
         if self.time_mode == "Fecha simulada":
@@ -431,10 +617,48 @@ class WebTwinState:
         self.history.clear()
         self.iterations = 0
         self._elapsed_s = 0.0
-        self.correction_az_deg = 0.0
-        self.correction_el_deg = 0.0
+        self.reset_tracking_schedule()
+        self.reset_correction()
+        self.add_event("Reloj", f"Fecha simulada aplicada: {parsed.isoformat(timespec='seconds')}")
+
+    def step_simulated_time(self, seconds: float | None = None) -> float:
+        if self.time_mode != "Fecha simulada" or self.running:
+            return 0.0
+        amount = max(0.0, float(self.simulation_step_s if seconds is None else seconds))
+        self.simulated_time += dt.timedelta(seconds=amount)
+        self._elapsed_s += amount
+        self.add_event("Reloj", f"Avance manual de {amount:g} s")
+        return amount
+
+    def reset_simulated_time(self) -> None:
+        self.simulated_time = self.simulated_start
+        self._elapsed_s = 0.0
+        self.history.clear()
+        self.reset_tracking_schedule()
+        self.reset_correction()
+        self.add_event("Reloj", "Reloj simulado reiniciado")
+
+    def start_replay(self) -> bool:
+        if not self.history:
+            self.add_event("Replay", "No hay muestras para reproducir")
+            return False
+        self.running = False
+        self.replay_rows = [dict(row) for row in self.history]
+        self.replay_index = 0
+        self.replay_active = True
+        self._sample_accumulator_s = 0.0
+        self.add_event("Replay", f"Reproduccion iniciada con {len(self.replay_rows)} muestras")
+        return True
+
+    def stop_replay(self) -> None:
+        if self.replay_active:
+            self.replay_active = False
+            self.replay_rows = []
+            self.replay_index = 0
+            self.add_event("Replay", "Regreso al estado vivo")
 
     def reset(self) -> None:
+        self.stop_replay()
         self.running = False
         self.session_started = False
         self.az_angle_deg = 0.0
@@ -445,17 +669,21 @@ class WebTwinState:
         self.history.clear()
         self.iterations = 0
         self._elapsed_s = 0.0
-        self.correction_az_deg = 0.0
-        self.correction_el_deg = 0.0
+        self.reset_tracking_schedule()
+        self.reset_correction()
+        self.add_event("Sistema", "Sesion restablecida para configurar")
 
     def start_or_toggle(self) -> None:
         self.session_started = True
         self.running = not self.running if self.session_started and self.running else True
 
     def pause_or_resume(self) -> None:
+        if self.replay_active:
+            self.stop_replay()
         if not self.session_started:
             self.session_started = True
         self.running = not self.running
+        self.add_event("Sesion", "Simulacion en marcha" if self.running else "Simulacion pausada")
 
     def _solar_geometry(self) -> dict[str, object]:
         when = self.active_datetime()
@@ -473,22 +701,75 @@ class WebTwinState:
             math.cos(altitude_rad) * math.cos(azimuth_rad),
             math.sin(altitude_rad),
         )
-        target = (self.rx, self.ry, self.rz)
-        target_direction = v_unit(target)
-        ideal_normal = compute_heliostat_normal(sun, target_direction)
-        ideal_az, ideal_el = angles_from_normal(ideal_normal)
+        nominal_target = (self.rx, self.ry, self.rz)
+        nominal_target_direction = v_unit(nominal_target)
+        ideal_normal = compute_heliostat_normal(sun, nominal_target_direction)
+        ideal_az_optical, ideal_el_optical = angles_from_normal(ideal_normal)
+        ideal_az = wrap_deg(ideal_az_optical + self.camera_offset_az_deg)
+        ideal_el = ideal_el_optical + self.peralte_deg + self.camera_offset_el_deg
         elapsed_hours = self._elapsed_s / 3600.0
-        effective_az_error = self.az_offset_deg + self.drift_az_deg_per_hour * elapsed_hours
-        effective_el_error = self.el_offset_deg + self.drift_el_deg_per_hour * elapsed_hours
-        actual_normal = normal_from_angles(
-            self.az_angle_deg + effective_az_error,
-            self.el_angle_deg + effective_el_error,
-        )
-        reflected = reflect_vector(v_mul(sun, -1.0), actual_normal)
-        valid, impact_u, impact_v, impact_radial, ray_distance = target_impact(reflected, target)
+        drift_az = self.drift_az_deg_per_hour * elapsed_hours
+        drift_el = self.drift_el_deg_per_hour * elapsed_hours
+
+        def scenario(name: str) -> dict[str, object]:
+            uses_errors = name != "Ideal"
+            corrected = name == "Corregido"
+            target = self._error_model.effective_target(nominal_target, uses_errors)
+            command_az = self.az_angle_deg
+            command_el = self.el_angle_deg - self.peralte_deg
+            if uses_errors:
+                command_az += drift_az
+                command_el += drift_el
+            if corrected:
+                command_az += self.correction_az_deg
+                command_el += self.correction_el_deg
+            normal = self._error_model.normal_from_command(
+                command_az,
+                command_el,
+                self.motion_error_sample,
+                include_errors=uses_errors,
+                corrected=False,
+            )
+            reflected = reflect_vector(v_mul(sun, -1.0), normal)
+            valid, impact_u, impact_v, impact_radial, ray_distance = target_impact(reflected, target)
+            target_direction = v_unit(target)
+            return {
+                "target": target,
+                "target_direction": target_direction,
+                "normal": normal,
+                "reflected": reflected,
+                "spot_valid": valid,
+                "spot_u_m": impact_u,
+                "spot_v_m": impact_v,
+                "spot_radial_m": impact_radial,
+                "ray_distance_m": ray_distance,
+                "incidence_deg": angle_between(sun, normal),
+                "reflection_deg": angle_between(reflected, normal),
+                "target_difference_deg": angle_between(reflected, target_direction),
+            }
+
+        scenarios = {name: scenario(name) for name in ("Ideal", "Con error", "Corregido")}
+        selected = scenarios.get(self.error_mode, scenarios["Corregido"])
+        actual_normal = selected["normal"]
+        reflected = selected["reflected"]
+        target = selected["target"]
+        target_direction = selected["target_direction"]
+        valid = selected["spot_valid"]
+        impact_u = selected["spot_u_m"]
+        impact_v = selected["spot_v_m"]
+        impact_radial = selected["spot_radial_m"]
+        ray_distance = selected["ray_distance_m"]
         incidence = angle_between(sun, actual_normal)
         reflection = angle_between(reflected, actual_normal)
         target_difference = angle_between(reflected, target_direction)
+        configured_az_error = (
+            (self.error_config.azimuth_offset_deg if self.error_config.enable_azimuth_offset else 0.0)
+            + (self.error_config.north_south_misalignment_deg if self.error_config.enable_north_south_misalignment else 0.0)
+        )
+        configured_el_error = (
+            (self.error_config.elevation_offset_deg if self.error_config.enable_elevation_offset else 0.0)
+            + (self.error_config.peralte_error_deg if self.error_config.enable_peralte_error else 0.0)
+        )
         return {
             "when": when,
             "zenith_deg": zenith,
@@ -510,47 +791,86 @@ class WebTwinState:
             "incidence_deg": incidence,
             "reflection_deg": reflection,
             "target_difference_deg": target_difference,
-            "effective_az_error_deg": effective_az_error,
-            "effective_el_error_deg": effective_el_error,
+            "effective_az_error_deg": configured_az_error + drift_az,
+            "effective_el_error_deg": configured_el_error + drift_el,
+            "ideal_spot_u_m": scenarios["Ideal"]["spot_u_m"],
+            "ideal_spot_v_m": scenarios["Ideal"]["spot_v_m"],
+            "ideal_spot_radial_m": scenarios["Ideal"]["spot_radial_m"],
+            "error_spot_u_m": scenarios["Con error"]["spot_u_m"],
+            "error_spot_v_m": scenarios["Con error"]["spot_v_m"],
+            "error_spot_radial_m": scenarios["Con error"]["spot_radial_m"],
+            "corrected_spot_u_m": scenarios["Corregido"]["spot_u_m"],
+            "corrected_spot_v_m": scenarios["Corregido"]["spot_v_m"],
+            "corrected_spot_radial_m": scenarios["Corregido"]["spot_radial_m"],
+            "error_target": scenarios["Con error"]["target"],
         }
 
     def step(self, wall_dt_s: float) -> None:
         wall_dt_s = clamp(float(wall_dt_s), 0.0, 1.0)
+        if self.replay_active:
+            self._sample_accumulator_s += wall_dt_s
+            if self.replay_rows and self._sample_accumulator_s >= 0.65:
+                self._sample_accumulator_s = 0.0
+                self.replay_index = (self.replay_index + 1) % len(self.replay_rows)
+            return
         if not self.running:
             return
+        solar_elapsed_s = wall_dt_s * (max(0.0, self.time_scale) if self.time_mode == "Fecha simulada" else 1.0)
         if self.time_mode == "Fecha simulada":
-            self.simulated_time += dt.timedelta(seconds=wall_dt_s * max(0.0, self.time_scale))
-        self._elapsed_s += wall_dt_s * (max(0.0, self.time_scale) if self.time_mode == "Fecha simulada" else 1.0)
+            self.simulated_time += dt.timedelta(seconds=solar_elapsed_s)
+        self._elapsed_s += solar_elapsed_s
         geometry = self._solar_geometry()
         if self.mode == "Automatico" and self.tracking:
-            self.az_target_deg = float(geometry["ideal_az_deg"]) + self.correction_az_deg
-            self.el_target_deg = float(geometry["ideal_el_deg"]) + self.correction_el_deg
+            if not self._last_tracking_state:
+                self.reset_tracking_schedule()
+            if self.tracking_schedule_initialized:
+                self.seconds_since_tracking_update += solar_elapsed_s
+                self._accumulate_tracking_error(float(geometry["corrected_spot_radial_m"]))
+            interval_due = (
+                not self.tracking_updates_manual
+                and self.seconds_since_tracking_update + 1e-9 >= self.tracking_update_interval_s
+            )
+            if not self.tracking_schedule_initialized or self.tracking_update_pending or interval_due:
+                self._apply_tracking_update(
+                    float(geometry["ideal_az_deg"]),
+                    float(geometry["ideal_el_deg"]),
+                )
+            self.az_target_deg = self.held_target_az_deg
+            self.el_target_deg = self.held_target_el_deg
+        elif self.mode == "Automatico" and self._last_tracking_state and not self.tracking:
+            self.stop_manual_motion()
         elif self.mode == "Home":
             self.az_target_deg = 0.0
             self.el_target_deg = 90.0
+        self._last_tracking_state = self.tracking
         self.az_target_deg = clamp(self.az_target_deg, self.az_limit_min, self.az_limit_max)
         self.el_target_deg = clamp(self.el_target_deg, self.el_limit_min, self.el_limit_max)
-        self.az_angle_deg = move_toward(
-            self.az_angle_deg,
-            self.az_target_deg,
-            self.az_deg_per_second * clamp(self.az_pwm, 0.0, 1.0) * wall_dt_s,
-            wrap=True,
-        )
-        self.el_angle_deg = move_toward(
-            self.el_angle_deg,
-            self.el_target_deg,
-            self.el_deg_per_second * clamp(self.el_pwm, 0.0, 1.0) * wall_dt_s,
-        )
+        if self.az_motor_on and abs(wrap_deg(self.az_target_deg - self.az_angle_deg)) > self.cdr_deg:
+            self.az_angle_deg = move_toward(
+                self.az_angle_deg,
+                self.az_target_deg,
+                self.az_deg_per_second * clamp(self.az_pwm, 0.0, 1.0) * wall_dt_s,
+                wrap=True,
+            )
+        if self.el_motor_on and abs(self.el_target_deg - self.el_angle_deg) > self.cdr_deg:
+            self.el_angle_deg = move_toward(
+                self.el_angle_deg,
+                self.el_target_deg,
+                self.el_deg_per_second * clamp(self.el_pwm, 0.0, 1.0) * wall_dt_s,
+            )
+        self._update_correction(solar_elapsed_s)
         self.iterations += 1
         self._sample_accumulator_s += wall_dt_s
         if self._sample_accumulator_s >= 0.5:
             self._sample_accumulator_s = 0.0
             self.history.append(self.snapshot())
-            if len(self.history) > 1200:
-                del self.history[:-1200]
+            if len(self.history) > max(2, min(int(self.history_limit), 20000)):
+                del self.history[:-self.history_limit]
 
     def status(self, snapshot: dict[str, object] | None = None) -> tuple[str, str]:
         sample = snapshot or self.snapshot()
+        if self.replay_active:
+            return f"REPLAY {self.replay_index + 1}/{len(self.replay_rows)}", "paused"
         if not self.session_started:
             return "LISTO PARA CONFIGURAR", "config"
         if not self.running:
@@ -564,16 +884,32 @@ class WebTwinState:
         return "MOVIENDO AL OBJETIVO", "moving"
 
     def snapshot(self) -> dict[str, object]:
+        if self.replay_active and self.replay_rows:
+            replay_sample = dict(self.replay_rows[self.replay_index])
+            replay_sample["status"], replay_sample["status_kind"] = self.status(replay_sample)
+            replay_sample["replay_active"] = True
+            replay_sample["replay_index"] = self.replay_index
+            return replay_sample
         geometry = self._solar_geometry()
         radial_m = float(geometry["spot_radial_m"])
+        facet_analysis = self.facet_analysis()
+        spot_metrics = facet_analysis["spot_metrics"]
+        active_errors = list(self.error_config.active_error_names())
+        if abs(self.drift_az_deg_per_hour) > 1e-12 or abs(self.drift_el_deg_per_hour) > 1e-12:
+            active_errors.append("deriva temporal")
         result: dict[str, object] = {
             "simulator_version": WEB_APP_VERSION,
             "timestamp": geometry["when"].isoformat(timespec="seconds"),
             "time_mode": self.time_mode,
             "time_scale": self.time_scale,
+            "simulation_step_s": self.simulation_step_s,
             "mode": self.mode,
+            "tracking": self.tracking,
+            "session_started": self.session_started,
             "running": self.running,
+            "replay_active": False,
             "iterations": self.iterations,
+            "history_limit": self.history_limit,
             "az_deg": self.az_angle_deg,
             "el_deg": self.el_angle_deg,
             "az_target_deg": self.az_target_deg,
@@ -595,16 +931,84 @@ class WebTwinState:
             "effective_el_error_deg": geometry["effective_el_error_deg"],
             "correction_az_deg": self.correction_az_deg,
             "correction_el_deg": self.correction_el_deg,
+            "correction_enabled": self.correction_config.enabled,
+            "correction_strategy": self.correction_config.strategy,
+            "correction_update_count": self.correction_update_count,
+            "correction_constant_az_deg": self.correction_config.constant_az_deg,
+            "correction_constant_el_deg": self.correction_config.constant_el_deg,
+            "correction_rate_az_deg_per_hour": self.correction_config.time_az_rate_deg_per_hour,
+            "correction_rate_el_deg_per_hour": self.correction_config.time_el_rate_deg_per_hour,
+            "correction_poly_az_c0": self.correction_config.polynomial_az_c0,
+            "correction_poly_az_c1": self.correction_config.polynomial_az_c1,
+            "correction_poly_az_c2": self.correction_config.polynomial_az_c2,
+            "correction_poly_el_c0": self.correction_config.polynomial_el_c0,
+            "correction_poly_el_c1": self.correction_config.polynomial_el_c1,
+            "correction_poly_el_c2": self.correction_config.polynomial_el_c2,
+            "correction_gain": self.correction_gain,
+            "correction_max_step_deg": self.correction_config.image_max_step_deg,
+            "correction_camera_interval_s": self.correction_config.camera_interval_s,
+            "error_mode": self.error_mode,
+            "active_errors": ", ".join(active_errors) if active_errors else "ninguno",
+            "ideal_spot_u_mm": float(geometry["ideal_spot_u_m"]) * 1000.0,
+            "ideal_spot_v_mm": float(geometry["ideal_spot_v_m"]) * 1000.0,
+            "ideal_spot_radial_mm": float(geometry["ideal_spot_radial_m"]) * 1000.0,
+            "error_spot_u_mm": float(geometry["error_spot_u_m"]) * 1000.0,
+            "error_spot_v_mm": float(geometry["error_spot_v_m"]) * 1000.0,
+            "error_spot_radial_mm": float(geometry["error_spot_radial_m"]) * 1000.0,
+            "corrected_spot_u_mm": float(geometry["corrected_spot_u_m"]) * 1000.0,
+            "corrected_spot_v_mm": float(geometry["corrected_spot_v_m"]) * 1000.0,
+            "corrected_spot_radial_mm": float(geometry["corrected_spot_radial_m"]) * 1000.0,
+            "tracking_update_interval_s": "manual" if self.tracking_updates_manual else self.tracking_update_interval_s,
+            "seconds_since_tracking_update_s": self.seconds_since_tracking_update,
+            "tracking_update_count": self.tracking_update_count,
+            "tracking_error_max_mm": self.tracking_error_max_m * 1000.0,
+            "tracking_error_average_mm": self.tracking_error_average_m * 1000.0,
+            "tracking_error_rms_mm": self.tracking_error_rms_m * 1000.0,
             "sun": geometry["sun"],
             "normal": geometry["actual_normal"],
             "reflected": geometry["reflected"],
             "target": geometry["target"],
+            "sun_x": geometry["sun"][0],
+            "sun_y": geometry["sun"][1],
+            "sun_z": geometry["sun"][2],
+            "normal_x": geometry["actual_normal"][0],
+            "normal_y": geometry["actual_normal"][1],
+            "normal_z": geometry["actual_normal"][2],
+            "reflected_x": geometry["reflected"][0],
+            "reflected_y": geometry["reflected"][1],
+            "reflected_z": geometry["reflected"][2],
+            "target_x_m": geometry["target"][0],
+            "target_y_m": geometry["target"][1],
+            "target_z_m": geometry["target"][2],
+            "lat_deg": self.lat_deg,
+            "lon_deg": self.lon_deg,
+            "utc_offset_hours": self.utc_offset_hours,
+            "solar_method": self.method,
             "mirror_size_m": self.mirror_size_m,
             "base_width_m": self.base_width_m,
             "fork_height_m": self.fork_height_m,
             "rail_length_m": self.rail_length_m,
             "receiver_screen_m": self.receiver_screen_m,
             "target_tolerance_m": self.target_tolerance_m,
+            "peralte_deg": self.peralte_deg,
+            "cdr_deg": self.cdr_deg,
+            "camera_offset_az_deg": self.camera_offset_az_deg,
+            "camera_offset_el_deg": self.camera_offset_el_deg,
+            "control_delay_s": self.control_delay_s,
+            "az_limit_min_deg": self.az_limit_min,
+            "az_limit_max_deg": self.az_limit_max,
+            "el_limit_min_deg": self.el_limit_min,
+            "el_limit_max_deg": self.el_limit_max,
+            "az_motor_on": self.az_motor_on,
+            "el_motor_on": self.el_motor_on,
+            "az_pwm": self.az_pwm,
+            "el_pwm": self.el_pwm,
+            "az_speed_deg_s": self.az_deg_per_second,
+            "el_speed_deg_s": self.el_deg_per_second,
+            "az_encoder_counts": round(self.az_angle_deg * self.az_counts_per_degree),
+            "el_encoder_counts": round(self.el_angle_deg * self.el_counts_per_degree),
+            "az_counts_per_degree": self.az_counts_per_degree,
+            "el_counts_per_degree": self.el_counts_per_degree,
             "facet_enabled": self.facet_enabled,
             "facet_shape": self.facet_shape,
             "facet_count": self.facet_count,
@@ -613,11 +1017,55 @@ class WebTwinState:
             "facet_focal_distance_m": self.facet_focal_distance_m,
             "facet_selected_id": self.facet_selected_id,
             "facet_active_count": len(self.facet_active_ids),
+            "facet_active_ids": ",".join(sorted(self.facet_active_ids)),
             "facet_misalignment_h_deg": self.facet_horizontal_misalignment_deg,
             "facet_misalignment_v_deg": self.facet_vertical_misalignment_deg,
             "spot_map_enabled": self.spot_map_enabled,
             "spot_map_resolution": self.spot_map_resolution,
             "spot_normalization": self.spot_normalization,
+            "spot_base_sigma_m": self.spot_base_sigma_m,
+            "spot_map_half_size_m": self.spot_map_half_size_m,
+            "facet_error_max_mm": float(facet_analysis["error_max_m"]) * 1000.0,
+            "facet_error_average_mm": float(facet_analysis["error_average_m"]) * 1000.0,
+            "spot_centroid_u_mm": spot_metrics.centroid_u_m * 1000.0,
+            "spot_centroid_v_mm": spot_metrics.centroid_v_m * 1000.0,
+            "spot_centroid_error_mm": spot_metrics.centroid_error_m * 1000.0,
+            "spot_maximum_intensity": spot_metrics.maximum_intensity,
+            "spot_total_intensity": spot_metrics.total_intensity,
+            "spot_equivalent_diameter_mm": spot_metrics.equivalent_diameter_m * 1000.0,
+            "spot_shape": spot_metrics.shape,
+            "show_sun_vector": self.show_sun_vector,
+            "show_normal_vector": self.show_normal_vector,
+            "show_reflected_vector": self.show_reflected_vector,
+            "show_target_direction": self.show_target_direction,
+            "show_target_line": self.show_target_line,
+            "show_mechanical_guides": self.show_mechanical_guides,
+            "error_enable_azimuth_offset": self.error_config.enable_azimuth_offset,
+            "error_azimuth_offset_deg": self.error_config.azimuth_offset_deg,
+            "error_enable_elevation_offset": self.error_config.enable_elevation_offset,
+            "error_elevation_offset_deg": self.error_config.elevation_offset_deg,
+            "error_enable_north_south": self.error_config.enable_north_south_misalignment,
+            "error_north_south_deg": self.error_config.north_south_misalignment_deg,
+            "error_enable_target_xyz": self.error_config.enable_target_position_error,
+            "error_target_x_m": self.error_config.target_error_x_m,
+            "error_target_y_m": self.error_config.target_error_y_m,
+            "error_target_z_m": self.error_config.target_error_z_m,
+            "error_enable_heliostat_xyz": self.error_config.enable_heliostat_position_error,
+            "error_heliostat_x_m": self.error_config.heliostat_error_x_m,
+            "error_heliostat_y_m": self.error_config.heliostat_error_y_m,
+            "error_heliostat_z_m": self.error_config.heliostat_error_z_m,
+            "error_enable_peralte": self.error_config.enable_peralte_error,
+            "error_peralte_deg": self.error_config.peralte_error_deg,
+            "error_enable_backlash": self.error_config.enable_backlash,
+            "error_backlash_deg": self.error_config.backlash_deg,
+            "error_enable_directional": self.error_config.enable_directional_error,
+            "error_upward_deg": self.error_config.upward_error_deg,
+            "error_downward_deg": self.error_config.downward_error_deg,
+            "error_enable_noise": self.error_config.enable_random_noise,
+            "error_noise_std_deg": self.error_config.random_noise_std_deg,
+            "error_noise_seed": self.error_config.random_seed,
+            "drift_az_deg_per_hour": self.drift_az_deg_per_hour,
+            "drift_el_deg_per_hour": self.drift_el_deg_per_hour,
         }
         result["status"], result["status_kind"] = self.status(result)
         return result
@@ -667,7 +1115,7 @@ class WebTwinState:
         resolution = max(21, min(int(self.spot_map_resolution), 121))
         if resolution % 2 == 0:
             resolution += 1
-        target = (float(self.rx), float(self.ry), float(self.rz))
+        target = tuple(float(value) for value in self._solar_geometry()["target"])
         cache_key: tuple[object, ...] = (
             target,
             self.facet_shape,
@@ -784,3 +1232,70 @@ class WebTwinState:
         writer.writeheader()
         writer.writerows(serializable_rows)
         return stream.getvalue()
+
+    def export_facets_csv_text(self) -> str:
+        """Exporta una fila por faceta, incluida su geometria y su impacto."""
+        analysis = self.facet_analysis()
+        results = {item.facet_id: item for item in analysis["results"]}
+        rows: list[dict[str, object]] = []
+        for facet in analysis["facets"]:
+            result = results.get(facet.id)
+            impact = result.impact_point if result is not None else None
+            reflected = result.reflected_direction if result is not None else None
+            rows.append(
+                {
+                    "facet_id": facet.id,
+                    "active": facet.active,
+                    "shape": facet.shape,
+                    "size_m": facet.size,
+                    "layout_u_m": facet.layout_u_m,
+                    "layout_v_m": facet.layout_v_m,
+                    "center_x_m": facet.center[0],
+                    "center_y_m": facet.center[1],
+                    "center_z_m": facet.center[2],
+                    "normal_x": facet.normal[0],
+                    "normal_y": facet.normal[1],
+                    "normal_z": facet.normal[2],
+                    "impact_u_mm": result.impact_u_m * 1000.0 if result else "",
+                    "impact_v_mm": result.impact_v_m * 1000.0 if result else "",
+                    "focus_error_mm": result.focus_error_m * 1000.0 if result else "",
+                    "impact_x_m": impact[0] if impact else "",
+                    "impact_y_m": impact[1] if impact else "",
+                    "impact_z_m": impact[2] if impact else "",
+                    "reflected_x": reflected[0] if reflected else "",
+                    "reflected_y": reflected[1] if reflected else "",
+                    "reflected_z": reflected[2] if reflected else "",
+                }
+            )
+        if not rows:
+            rows.append({"facet_id": "", "active": False, "shape": self.facet_shape})
+        stream = io.StringIO()
+        fieldnames = list(rows[0].keys())
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+        return stream.getvalue()
+
+    def export_events_csv_text(self) -> str:
+        rows = self.events or [{"timestamp": "", "category": "", "message": "Sin eventos"}]
+        stream = io.StringIO()
+        writer = csv.DictWriter(stream, fieldnames=("timestamp", "category", "message"))
+        writer.writeheader()
+        writer.writerows(rows)
+        return stream.getvalue()
+
+    def export_experiment_zip(self) -> bytes:
+        """Empaqueta historial, facetas y bitacora sin usar el sistema de archivos."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("historial.csv", self.export_csv_text())
+            archive.writestr("facetas.csv", self.export_facets_csv_text())
+            archive.writestr("eventos.csv", self.export_events_csv_text())
+            archive.writestr(
+                "LEEME.txt",
+                "Gemelo digital web 0.4.0\n"
+                "historial.csv: serie temporal y configuracion completa.\n"
+                "facetas.csv: una fila por faceta con geometria, normal e impacto.\n"
+                "eventos.csv: bitacora operativa de la sesion.\n",
+            )
+        return buffer.getvalue()

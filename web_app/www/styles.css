@@ -304,8 +304,60 @@ body {
 
 .action-row {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   flex: 0 0 auto;
+}
+
+.nested-controls {
+  margin: 9px 0;
+  padding: 9px 10px;
+  border: 1px solid #c5d1da;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.nested-controls > summary {
+  cursor: pointer;
+  color: #0f4c5c;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.event-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  font-size: 0.82rem;
+}
+
+.events-table th,
+.events-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid #d7e0e7;
+  text-align: left;
+  vertical-align: top;
+}
+
+.events-table th {
+  position: sticky;
+  top: 0;
+  background: #123d55;
+  color: #ffffff;
+}
+
+.events-panel {
+  max-height: 660px;
+  overflow: auto;
 }
 
 .action-row > .shiny-bound-output {
@@ -512,6 +564,17 @@ a.secondary-action:focus {
   padding: 12px 18px;
   background: #102638;
   color: white;
+}
+
+.drift-toolbar .form-group {
+  min-width: 220px;
+  margin: 0;
+}
+
+.drift-toolbar label {
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .correction-readout {

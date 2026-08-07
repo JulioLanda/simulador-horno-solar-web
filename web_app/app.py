@@ -18,6 +18,93 @@ except ImportError:
 
 APP_DIR = Path(__file__).parent
 
+CSV_COLUMN_DICTIONARY = (
+    (
+        "Sesión y tiempo",
+        "Contexto temporal y estado de ejecución de cada muestra.",
+        "blue",
+        (
+            ("simulator_version", "Versión de la aplicación web que produjo el archivo.", "texto"),
+            ("timestamp", "Fecha y hora del reloj del experimento para esta muestra, en formato ISO 8601.", "fecha-hora"),
+            ("time_mode", "Origen del reloj: Tiempo real o Fecha simulada.", "texto"),
+            ("time_scale", "Multiplicador aplicado al avance del reloj cuando se usa fecha simulada.", "factor ×"),
+            ("mode", "Modo de operación del heliostato: Automático, Manual o Home.", "texto"),
+            ("running", "Indica si la simulación estaba avanzando al crear la muestra.", "True / False"),
+            ("iterations", "Número acumulado de actualizaciones ejecutadas desde el inicio de la sesión.", "conteo"),
+        ),
+    ),
+    (
+        "Seguimiento, óptica e impacto",
+        "Pose, objetivo, Sol, reflexión, errores y resultado sobre el receptor.",
+        "teal",
+        (
+            ("az_deg", "Ángulo de acimut real del heliostato en la muestra; oeste es positivo.", "grados"),
+            ("el_deg", "Ángulo de elevación real del heliostato.", "grados"),
+            ("az_target_deg", "Acimut objetivo que el controlador intenta alcanzar.", "grados"),
+            ("el_target_deg", "Elevación objetivo que el controlador intenta alcanzar.", "grados"),
+            ("az_error_deg", "Diferencia angular envuelta entre acimut objetivo y acimut real.", "grados"),
+            ("el_error_deg", "Diferencia entre elevación objetivo y elevación real.", "grados"),
+            ("spot_valid", "Indica si el rayo reflejado cruza frontalmente el plano receptor.", "True / False"),
+            ("spot_u_mm", "Coordenada horizontal del impacto; positiva hacia el oeste del receptor.", "mm"),
+            ("spot_v_mm", "Coordenada vertical del impacto; positiva hacia el cenit.", "mm"),
+            ("spot_radial_mm", "Distancia del impacto al centro: raíz cuadrada de u² + v².", "mm"),
+            ("ray_distance_m", "Distancia recorrida desde el heliostato hasta la intersección con el receptor.", "m"),
+            ("zenith_deg", "Ángulo cenital solar; equivale a 90° menos la altura solar.", "grados"),
+            ("altitude_deg", "Altura del Sol sobre el horizonte.", "grados"),
+            ("solar_azimuth_deg", "Acimut solar en la convención del laboratorio: este negativo, sur 0° y oeste positivo.", "grados"),
+            ("incidence_deg", "Ángulo entre la dirección hacia el Sol y la normal real del espejo.", "grados"),
+            ("reflection_deg", "Ángulo entre el rayo reflejado y la normal real del espejo.", "grados"),
+            ("target_difference_deg", "Separación angular entre el rayo reflejado y la dirección ideal hacia el target.", "grados"),
+            ("effective_az_error_deg", "Error geométrico efectivo de acimut: offset más deriva acumulada.", "grados"),
+            ("effective_el_error_deg", "Error geométrico efectivo de elevación: offset más deriva acumulada.", "grados"),
+            ("correction_az_deg", "Compensación acumulada que se suma al objetivo de acimut.", "grados"),
+            ("correction_el_deg", "Compensación acumulada que se suma al objetivo de elevación.", "grados"),
+        ),
+    ),
+    (
+        "Geometría",
+        "Dimensiones principales vigentes en el modelo durante la muestra.",
+        "gold",
+        (
+            ("mirror_size_m", "Longitud del lado del espejo del heliostato.", "m"),
+            ("base_width_m", "Ancho configurado de la base del heliostato.", "m"),
+            ("fork_height_m", "Altura configurada de la horquilla.", "m"),
+            ("rail_length_m", "Longitud configurada del riel entre estructuras.", "m"),
+            ("receiver_screen_m", "Diámetro de la pantalla o plano receptor.", "m"),
+            ("target_tolerance_m", "Radio de tolerancia permitido alrededor del centro del target.", "m"),
+        ),
+    ),
+    (
+        "Facetas y mapa",
+        "Configuración global del concentrador facetado y del mapa de intensidad.",
+        "red",
+        (
+            ("facet_enabled", "Indica si el modelo de concentrador facetado estaba activo.", "True / False"),
+            ("facet_shape", "Forma geométrica seleccionada: cuadrada, circular o hexagonal.", "texto"),
+            ("facet_count", "Número total de facetas generado por el acomodo automático.", "conteo"),
+            ("facet_size_m", "Lado, diámetro o ancho entre caras, según la forma seleccionada.", "m"),
+            ("facet_gap_m", "Separación libre configurada entre facetas adyacentes.", "m"),
+            ("facet_focal_distance_m", "Distancia focal utilizada para orientar las facetas hacia el foco.", "m"),
+            ("facet_selected_id", "Identificador de la faceta seleccionada para edición, por ejemplo F5.", "texto"),
+            ("facet_active_count", "Cantidad de facetas que contribuyen activamente al cálculo.", "conteo"),
+            ("facet_misalignment_h_deg", "Desalineación horizontal aplicada a la faceta seleccionada.", "grados"),
+            ("facet_misalignment_v_deg", "Desalineación vertical aplicada a la faceta seleccionada.", "grados"),
+            ("spot_map_enabled", "Indica si estaba activado el cálculo del mapa de intensidad.", "True / False"),
+            ("spot_map_resolution", "Cantidad de puntos por lado de la cuadrícula del mapa; siempre debe ser impar.", "puntos/lado"),
+            ("spot_normalization", "Regla de escala del mapa: total, pico o sin normalizar.", "texto"),
+        ),
+    ),
+    (
+        "Estado operacional",
+        "Resultado resumido que la interfaz mostraba en ese instante.",
+        "green",
+        (
+            ("status", "Mensaje visible del estado: en objetivo, moviendo, pausada, Sol bajo o sin impacto.", "texto"),
+            ("status_kind", "Categoría interna usada para color y presentación: config, paused, alert, ok o moving.", "texto"),
+        ),
+    ),
+)
+
 
 def number(value: object, digits: int = 2) -> str:
     try:
@@ -746,7 +833,7 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.3.5"),
+            ui.strong("Versión web 0.3.6"),
             ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
@@ -801,48 +888,48 @@ def csv_export_help() -> object:
     )
 
 
+def csv_dictionary_section(
+    title: str,
+    description: str,
+    tone: str,
+    columns: tuple[tuple[str, str, str], ...],
+    opened: bool = False,
+) -> object:
+    attributes = {"class": f"csv-dictionary-section csv-dictionary-{tone}"}
+    if opened:
+        attributes["open"] = "open"
+    return ui.tags.details(
+        ui.tags.summary(
+            ui.div(ui.strong(title), ui.span(description)),
+            ui.tags.small(f"{len(columns)} columnas"),
+        ),
+        ui.div(
+            ui.div(ui.span("Columna"), ui.span("Qué significa"), ui.span("Unidad / tipo"), class_="csv-dictionary-row csv-dictionary-head"),
+            *(
+                ui.div(
+                    ui.tags.code(name),
+                    ui.span(meaning),
+                    ui.span(unit, class_="csv-dictionary-unit"),
+                    class_="csv-dictionary-row",
+                )
+                for name, meaning, unit in columns
+            ),
+            class_="csv-dictionary-table",
+        ),
+        **attributes,
+    )
+
+
 def csv_guide_panel() -> object:
-    column_groups = (
+    column_groups = tuple(
         (
-            "01",
-            "Sesión y tiempo",
-            "7 columnas",
-            "Versión, fecha/hora, tipo y escala de reloj, modo, ejecución e iteraciones.",
-            "simulator_version · timestamp · time_mode · time_scale · mode · running · iterations",
-            "blue",
-        ),
-        (
-            "02",
-            "Seguimiento y óptica",
-            "21 columnas",
-            "Pose y objetivo AZ/EL, errores, correcciones, Sol, incidencia, reflexión, distancia e impacto.",
-            "az_deg · el_deg · az_target_deg · el_target_deg · az_error_deg · el_error_deg · effective_az_error_deg · effective_el_error_deg · correction_az_deg · correction_el_deg · zenith_deg · altitude_deg · solar_azimuth_deg · incidence_deg · reflection_deg · target_difference_deg · ray_distance_m · spot_valid · spot_u_mm · spot_v_mm · spot_radial_mm",
-            "teal",
-        ),
-        (
-            "03",
-            "Geometría",
-            "6 columnas",
-            "Tamaños principales del heliostato, riel, receptor y tolerancia del target.",
-            "mirror_size_m · base_width_m · fork_height_m · rail_length_m · receiver_screen_m · target_tolerance_m",
-            "gold",
-        ),
-        (
-            "04",
-            "Facetas y mapa",
-            "13 columnas",
-            "Activación, forma, cantidad, tamaño, separación, foco, selección, desalineación y opciones del mapa.",
-            "facet_enabled · facet_shape · facet_count · facet_size_m · facet_gap_m · facet_focal_distance_m · facet_selected_id · facet_active_count · facet_misalignment_h_deg · facet_misalignment_v_deg · spot_map_enabled · spot_map_resolution · spot_normalization",
-            "red",
-        ),
-        (
-            "05",
-            "Estado",
-            "2 columnas",
-            "Texto del estado operacional y su categoría interna.",
-            "status · status_kind",
-            "green",
-        ),
+            f"{index:02}",
+            title,
+            f"{len(columns)} columnas",
+            description,
+            tone,
+        )
+        for index, (title, description, tone, columns) in enumerate(CSV_COLUMN_DICTIONARY, 1)
     )
     return ui.div(
         ui.div(
@@ -892,20 +979,22 @@ def csv_guide_panel() -> object:
                     ui.p(description),
                     class_=f"csv-group-card csv-group-{tone}",
                 )
-                for number_text, title, count, description, _columns, tone in column_groups
+                for number_text, title, count, description, tone in column_groups
             ),
             class_="csv-group-grid",
         ),
-        ui.tags.details(
-            ui.tags.summary("Ver los nombres exactos de las 49 columnas"),
+        ui.div(
             ui.div(
-                *(
-                    ui.div(ui.strong(f"{title} · {count}"), ui.tags.code(columns), class_="csv-column-list")
-                    for _number_text, title, count, _description, columns, _tone in column_groups
-                ),
-                class_="csv-column-lists",
+                ui.div("DICCIONARIO DE DATOS", class_="guide-section-kicker"),
+                ui.h4("Significado de cada columna"),
+                ui.p("Abre cada grupo para consultar el nombre escrito en el archivo, su interpretación y la unidad o tipo de dato."),
+                class_="csv-dictionary-heading",
             ),
-            class_="csv-column-details",
+            *(
+                csv_dictionary_section(title, description, tone, columns, opened=index == 0)
+                for index, (title, description, tone, columns) in enumerate(CSV_COLUMN_DICTIONARY)
+            ),
+            class_="csv-dictionary",
         ),
         ui.div(
             ui.strong("El CSV no guarda"),
@@ -1363,7 +1452,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.5"),
+            ui.h1("Mini horno solar · Web 0.3.6"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),

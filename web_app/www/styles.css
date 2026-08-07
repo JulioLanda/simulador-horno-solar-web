@@ -3310,6 +3310,155 @@ a.secondary-action:focus {
   white-space: normal;
 }
 
+.csv-dictionary {
+  display: grid;
+  gap: 9px;
+}
+
+.csv-dictionary-heading {
+  margin: 12px 0 3px;
+}
+
+.csv-dictionary-heading h4 {
+  margin: 3px 0 4px;
+  color: #102a43;
+  font-size: 0.98rem;
+}
+
+.csv-dictionary-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.7rem;
+}
+
+.csv-dictionary-section {
+  --dictionary-color: #29658a;
+  overflow: hidden;
+  border: 1px solid #c7d7e2;
+  border-left: 5px solid var(--dictionary-color);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.csv-dictionary-blue { --dictionary-color: #29658a; }
+.csv-dictionary-teal { --dictionary-color: #178ca4; }
+.csv-dictionary-gold { --dictionary-color: #b07712; }
+.csv-dictionary-red { --dictionary-color: #c43131; }
+.csv-dictionary-green { --dictionary-color: #16834f; }
+
+.csv-dictionary-section > summary {
+  display: grid;
+  grid-template-columns: 1fr auto 20px;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 15px;
+  cursor: pointer;
+  list-style: none;
+  background: #fff;
+}
+
+.csv-dictionary-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.csv-dictionary-section > summary::after {
+  grid-column: 3;
+  grid-row: 1;
+  color: var(--dictionary-color);
+  content: "+";
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.csv-dictionary-section[open] > summary::after {
+  content: "−";
+}
+
+.csv-dictionary-section > summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.csv-dictionary-section > summary strong {
+  color: #102a43;
+  font-size: 0.76rem;
+}
+
+.csv-dictionary-section > summary span {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.62rem;
+}
+
+.csv-dictionary-section > summary small {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: var(--dictionary-color);
+  background: color-mix(in srgb, var(--dictionary-color) 9%, white);
+  font: 800 0.57rem Consolas, monospace;
+  white-space: nowrap;
+}
+
+.csv-dictionary-table {
+  border-top: 1px solid #dbe4e9;
+}
+
+.csv-dictionary-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(330px, 2.4fr) minmax(110px, 0.55fr);
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid #e5ebef;
+}
+
+.csv-dictionary-row:last-child {
+  border-bottom: 0;
+}
+
+.csv-dictionary-row > * {
+  min-width: 0;
+  padding: 10px 13px;
+}
+
+.csv-dictionary-row > *:not(:last-child) {
+  border-right: 1px solid #e5ebef;
+}
+
+.csv-dictionary-row code {
+  color: var(--dictionary-color);
+  font-size: 0.65rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.csv-dictionary-row > span:nth-child(2) {
+  color: #3f596a;
+  font-size: 0.67rem;
+  line-height: 1.42;
+}
+
+.csv-dictionary-unit {
+  color: #526a78;
+  font: 750 0.6rem Consolas, monospace;
+  text-align: center;
+}
+
+.csv-dictionary-head {
+  min-height: 36px;
+  background: #edf3f6;
+}
+
+.csv-dictionary-head span {
+  color: #536f80 !important;
+  font-size: 0.56rem !important;
+  font-weight: 850;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
 .csv-not-included {
   display: grid;
   grid-template-columns: 125px 1fr;
@@ -3482,6 +3631,10 @@ a.secondary-action:focus {
   .csv-column-list,
   .csv-not-included {
     grid-template-columns: 1fr;
+  }
+
+  .csv-dictionary-row {
+    grid-template-columns: minmax(130px, 0.85fr) minmax(220px, 2fr) minmax(90px, 0.6fr);
   }
 
   .csv-flow-arrow {

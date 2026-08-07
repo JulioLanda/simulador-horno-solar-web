@@ -10,6 +10,7 @@ const COLORS = {
   mirrorEdge: 0xe9fbff,
   receiver: 0xd1a744,
   receiverDark: 0x735a22,
+  facetInactive: 0x5f6570,
   sun: 0xffdc4a,
   normal: 0xff9f43,
   target: 0x7de3ef,
@@ -166,9 +167,10 @@ function addReceiver(group, state) {
     const shape = String(state.facet_shape);
     const facetSize = Math.max(0.01, Number(state.facet_size_m));
     for (const facet of state.facets) {
+      const active = facet[3] !== false;
       const facetMesh = new THREE.Mesh(
         facetGeometry(shape, facetSize),
-        material(COLORS.receiver, { roughness: 0.36, metalness: 0.24, side: THREE.DoubleSide }),
+        material(active ? COLORS.receiver : COLORS.facetInactive, { roughness: 0.36, metalness: 0.24, side: THREE.DoubleSide }),
       );
       facetMesh.position.copy(center)
         .add(uAxis.clone().multiplyScalar(Number(facet[1])))
@@ -176,6 +178,20 @@ function addReceiver(group, state) {
         .add(axis.clone().multiplyScalar(-0.015));
       facetMesh.quaternion.copy(planeQuaternion);
       group.add(facetMesh);
+    }
+    if (Array.isArray(state.facet_rays)) {
+      for (const ray of state.facet_rays) {
+        if (!Array.isArray(ray[1]) || !Array.isArray(ray[2])) continue;
+        group.add(lineBetween(simVector(ray[1]), simVector(ray[2]), COLORS.ray, 1));
+      }
+    }
+    if (Array.isArray(state.facet_focus)) {
+      const focusMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(Math.max(0.025, screenSize * 0.025), 16, 12),
+        material(COLORS.target, { emissive: COLORS.target, emissiveIntensity: 0.35 }),
+      );
+      focusMarker.position.copy(simVector(state.facet_focus));
+      group.add(focusMarker);
     }
   }
 

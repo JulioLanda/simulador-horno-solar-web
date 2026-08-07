@@ -15,7 +15,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from digital_twin.facet_model import optimal_facet_offsets
+    from digital_twin.facet_model import (
+        build_compact_facets,
+        dot as facet_dot,
+        optimal_facet_offsets,
+        trace_facets,
+        unit as facet_unit,
+    )
+    from digital_twin.spot_model import (
+        SpotMetrics,
+        contribution_from_ray,
+        generate_spot_map,
+    )
 except ModuleNotFoundError:
     # En desarrollo ``engine.py`` vive en web_app y los modelos son hermanos;
     # en el paquete Shinylive, ``digital_twin`` queda dentro del mismo folder.
@@ -23,13 +34,24 @@ except ModuleNotFoundError:
         if (candidate / "digital_twin" / "facet_model.py").exists():
             sys.path.insert(0, str(candidate))
             break
-    from digital_twin.facet_model import optimal_facet_offsets
+    from digital_twin.facet_model import (
+        build_compact_facets,
+        dot as facet_dot,
+        optimal_facet_offsets,
+        trace_facets,
+        unit as facet_unit,
+    )
+    from digital_twin.spot_model import (
+        SpotMetrics,
+        contribution_from_ray,
+        generate_spot_map,
+    )
 
 
 TAU = 2.0 * math.pi
 DEG = math.pi / 180.0
 RAD = 180.0 / math.pi
-WEB_APP_VERSION = "0.2.4"
+WEB_APP_VERSION = "0.3.0"
 
 
 MINIHORNO_WEB_PROFILE = {
@@ -274,10 +296,24 @@ class WebTwinState:
     facet_size_m: float = MINIHORNO_WEB_PROFILE["facet_size_m"]
     facet_gap_m: float = MINIHORNO_WEB_PROFILE["facet_gap_m"]
     facet_focal_distance_m: float = MINIHORNO_WEB_PROFILE["facet_focal_distance_m"]
+    facet_selected_id: str = "F5"
+    facet_horizontal_misalignment_deg: float = 0.0
+    facet_vertical_misalignment_deg: float = 0.0
+    facet_active_ids: set[str] = field(
+        default_factory=lambda: {f"F{index}" for index in range(1, 10)}
+    )
+    spot_map_enabled: bool = False
+    spot_base_sigma_m: float = 0.003
+    spot_map_half_size_m: float = 0.050
+    spot_map_resolution: int = 51
+    spot_normalization: str = "Total = 1"
     iterations: int = 0
     history: list[dict[str, object]] = field(default_factory=list)
     _sample_accumulator_s: float = 0.0
     _elapsed_s: float = 0.0
+    _facet_previous_count: int = field(default=9, repr=False)
+    _facet_cache_key: tuple[object, ...] | None = field(default=None, repr=False)
+    _facet_cache: dict[str, object] | None = field(default=None, repr=False)
 
     def apply_profile(self, profile: dict[str, object]) -> None:
         """Aplica de forma segura un perfil geometrico compatible con la web."""
@@ -332,6 +368,46 @@ class WebTwinState:
     def stop_manual_motion(self) -> None:
         self.az_target_deg = self.az_angle_deg
         self.el_target_deg = self.el_angle_deg
+
+    def normalize_facet_selection(self) -> None:
+        """Mantiene IDs validos al cambiar la cantidad de facetas."""
+        previous_ids = set(self.facet_active_ids)
+        previous_selected = self.facet_selected_id
+        previous_count = self._facet_previous_count
+        count = max(1, min(int(self.facet_count), 200))
+        valid_ids = {f"F{index}" for index in range(1, count + 1)}
+        if count > self._facet_previous_count:
+            self.facet_active_ids.update(
+                f"F{index}" for index in range(self._facet_previous_count + 1, count + 1)
+            )
+        self.facet_active_ids.intersection_update(valid_ids)
+        selected = self.facet_selected_id.strip().upper()
+        if selected not in valid_ids:
+            selected = "F1"
+        self.facet_selected_id = selected
+        self._facet_previous_count = count
+        if (
+            previous_ids != self.facet_active_ids
+            or previous_selected != self.facet_selected_id
+            or previous_count != self._facet_previous_count
+        ):
+            self._facet_cache_key = None
+
+    def set_selected_facet_active(self, active: bool) -> None:
+        self.normalize_facet_selection()
+        if active:
+            self.facet_active_ids.add(self.facet_selected_id)
+        else:
+            self.facet_active_ids.discard(self.facet_selected_id)
+        self._facet_cache_key = None
+
+    def set_all_facets_active(self, active: bool) -> None:
+        count = max(1, min(int(self.facet_count), 200))
+        self.facet_active_ids = (
+            {f"F{index}" for index in range(1, count + 1)} if active else set()
+        )
+        self._facet_previous_count = count
+        self._facet_cache_key = None
 
     def apply_observed_correction(self) -> None:
         """Compensa gradualmente el error angular observado."""
@@ -534,6 +610,14 @@ class WebTwinState:
             "facet_count": self.facet_count,
             "facet_size_m": self.facet_size_m,
             "facet_gap_m": self.facet_gap_m,
+            "facet_focal_distance_m": self.facet_focal_distance_m,
+            "facet_selected_id": self.facet_selected_id,
+            "facet_active_count": len(self.facet_active_ids),
+            "facet_misalignment_h_deg": self.facet_horizontal_misalignment_deg,
+            "facet_misalignment_v_deg": self.facet_vertical_misalignment_deg,
+            "spot_map_enabled": self.spot_map_enabled,
+            "spot_map_resolution": self.spot_map_resolution,
+            "spot_normalization": self.spot_normalization,
         }
         result["status"], result["status_kind"] = self.status(result)
         return result
@@ -563,6 +647,131 @@ class WebTwinState:
             max(0.0, self.facet_gap_m),
         )
         return [(f"F{index}", u_m, v_m) for index, (u_m, v_m) in enumerate(offsets, 1)]
+
+    def facet_analysis(self) -> dict[str, object]:
+        """Calcula facetas, rayos centrales, impactos y mapa de intensidad."""
+        self.normalize_facet_selection()
+        if not self.facet_enabled:
+            return {
+                "facets": [],
+                "results": [],
+                "focus": (0.0, 0.0, 0.0),
+                "receiver_normal": (0.0, 1.0, 0.0),
+                "error_max_m": 0.0,
+                "error_average_m": 0.0,
+                "spot_map": None,
+                "spot_metrics": SpotMetrics(),
+            }
+
+        count = max(1, min(int(self.facet_count), 200))
+        resolution = max(21, min(int(self.spot_map_resolution), 121))
+        if resolution % 2 == 0:
+            resolution += 1
+        target = (float(self.rx), float(self.ry), float(self.rz))
+        cache_key: tuple[object, ...] = (
+            target,
+            self.facet_shape,
+            count,
+            float(self.facet_size_m),
+            float(self.facet_gap_m),
+            float(self.facet_focal_distance_m),
+            tuple(sorted(self.facet_active_ids)),
+            self.facet_selected_id,
+            float(self.facet_horizontal_misalignment_deg),
+            float(self.facet_vertical_misalignment_deg),
+            self.spot_map_enabled,
+            float(self.spot_base_sigma_m),
+            float(self.spot_map_half_size_m),
+            resolution,
+            self.spot_normalization,
+        )
+        if cache_key == self._facet_cache_key and self._facet_cache is not None:
+            return self._facet_cache
+
+        if v_norm(target) < 1e-12:
+            analysis = {
+                "facets": [],
+                "results": [],
+                "focus": (0.0, 0.0, 0.0),
+                "receiver_normal": (0.0, 1.0, 0.0),
+                "error_max_m": float("nan"),
+                "error_average_m": float("nan"),
+                "spot_map": None,
+                "spot_metrics": SpotMetrics(),
+            }
+            self._facet_cache_key = cache_key
+            self._facet_cache = analysis
+            return analysis
+        axis = facet_unit(target)
+        focal_distance = max(0.001, float(self.facet_focal_distance_m))
+        focus = v_sub(target, v_mul(axis, focal_distance))
+        facets = build_compact_facets(
+            concentrator_center=target,
+            focus=focus,
+            count=count,
+            shape=self.facet_shape,
+            size_m=max(0.001, float(self.facet_size_m)),
+            gap_m=max(0.0, float(self.facet_gap_m)),
+            focal_distance_m=focal_distance,
+            active_ids=set(self.facet_active_ids),
+            misaligned_facet_id=self.facet_selected_id,
+            horizontal_misalignment_deg=float(self.facet_horizontal_misalignment_deg),
+            vertical_misalignment_deg=float(self.facet_vertical_misalignment_deg),
+        )
+        results = trace_facets(
+            facets,
+            heliostat_origin=(0.0, 0.0, 0.0),
+            receiver_center=focus,
+            receiver_normal=axis,
+        )
+        errors = [result.focus_error_m for result in results if math.isfinite(result.focus_error_m)]
+        spot_map = None
+        spot_metrics = SpotMetrics()
+        if self.spot_map_enabled and results:
+            facets_by_id = {facet.id: facet for facet in facets}
+            contributions = []
+            for result in results:
+                facet = facets_by_id.get(result.facet_id)
+                if facet is None:
+                    continue
+                if facet.shape == "Circular":
+                    area_factor = math.pi / 4.0
+                elif facet.shape == "Hexagonal":
+                    area_factor = math.sqrt(3.0) / 2.0
+                else:
+                    area_factor = 1.0
+                receiver_cosine = abs(
+                    facet_dot(facet_unit(result.reflected_direction), axis)
+                )
+                contribution = contribution_from_ray(
+                    result,
+                    receiver_normal=axis,
+                    base_sigma_m=max(1e-5, float(self.spot_base_sigma_m)),
+                    weight=area_factor * receiver_cosine,
+                )
+                if contribution is not None:
+                    contributions.append(contribution)
+            spot_map = generate_spot_map(
+                contributions,
+                half_size_m=max(0.001, float(self.spot_map_half_size_m)),
+                resolution=resolution,
+                normalization=self.spot_normalization,
+            )
+            spot_metrics = spot_map.metrics
+
+        analysis: dict[str, object] = {
+            "facets": facets,
+            "results": results,
+            "focus": focus,
+            "receiver_normal": axis,
+            "error_max_m": max(errors, default=0.0),
+            "error_average_m": sum(errors) / len(errors) if errors else 0.0,
+            "spot_map": spot_map,
+            "spot_metrics": spot_metrics,
+        }
+        self._facet_cache_key = cache_key
+        self._facet_cache = analysis
+        return analysis
 
     def export_csv_text(self) -> str:
         rows = self.history or [self.snapshot()]

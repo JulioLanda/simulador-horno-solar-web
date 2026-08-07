@@ -11,6 +11,13 @@ def postprocess(site_dir: Path, version: str) -> None:
     runtime_path = site_dir / "shinylive" / "shinylive.js"
 
     index = index_path.read_text(encoding="utf-8")
+    if "<title>Shiny App</title>" not in index:
+        raise RuntimeError("No se encontro el titulo generico de Shinylive")
+    index = index.replace('<html lang="en">', '<html lang="es">')
+    index = index.replace(
+        "<title>Shiny App</title>",
+        "<title>Gemelo digital del mini horno solar</title>",
+    )
     index = index.replace(
         'src="./shinylive/load-shinylive-sw.js"',
         f'src="./shinylive/load-shinylive-sw.js?v={version}"',

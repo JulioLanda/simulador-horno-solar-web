@@ -105,6 +105,36 @@ class WebTwinEngineTests(unittest.TestCase):
         self.assertAlmostEqual(float(sample["mirror_size_m"]), 0.2)
         self.assertAlmostEqual(float(sample["base_width_m"]), 0.19)
 
+    def test_facet_analysis_traces_rays_and_builds_intensity_map(self) -> None:
+        state = WebTwinState(facet_enabled=True, spot_map_enabled=True)
+        analysis = state.facet_analysis()
+        self.assertEqual(len(analysis["facets"]), 9)
+        self.assertEqual(len(analysis["results"]), 9)
+        self.assertIsNotNone(analysis["spot_map"])
+        self.assertEqual(analysis["spot_map"].resolution, 51)
+
+    def test_selected_facet_can_be_misaligned_and_disabled(self) -> None:
+        state = WebTwinState(
+            facet_enabled=True,
+            facet_selected_id="F1",
+            facet_horizontal_misalignment_deg=0.5,
+        )
+        analysis = state.facet_analysis()
+        result = next(item for item in analysis["results"] if item.facet_id == "F1")
+        self.assertGreater(result.focus_error_m, 0.001)
+        state.set_selected_facet_active(False)
+        analysis = state.facet_analysis()
+        self.assertEqual(len(analysis["results"]), 8)
+        self.assertFalse(next(item for item in analysis["facets"] if item.id == "F1").active)
+
+    def test_requested_odd_spot_resolution_is_preserved(self) -> None:
+        state = WebTwinState(
+            facet_enabled=True,
+            spot_map_enabled=True,
+            spot_map_resolution=101,
+        )
+        self.assertEqual(state.facet_analysis()["spot_map"].resolution, 101)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -833,7 +833,7 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.3.6"),
+            ui.strong("Versión web 0.3.7"),
             ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
@@ -859,32 +859,6 @@ def guide_screen_card(title: str, caption: str, preview: object, badge: str) -> 
         ui.div(preview, ui.span(badge, class_="screen-badge"), class_="screen-preview"),
         ui.div(ui.strong(title), ui.span(caption), class_="screen-card-copy"),
         class_="guide-screen-card",
-    )
-
-
-def csv_export_help() -> object:
-    return ui.tags.details(
-        ui.tags.summary(ui.span("?", class_="csv-help-icon"), ui.span("¿QUÉ GUARDA?")),
-        ui.div(
-            ui.div(
-                ui.span("CSV", class_="csv-popover-mark"),
-                ui.div(ui.strong("Historial de la sesión"), ui.span("49 columnas por muestra")),
-                class_="csv-popover-title",
-            ),
-            ui.p("Registra una fila aproximadamente cada 0.5 segundos mientras la sesión está en marcha, hasta 1,200 filas."),
-            ui.div(
-                ui.span("Tiempo y modo"),
-                ui.span("AZ / EL y óptica"),
-                ui.span("Impacto u / v / r"),
-                ui.span("Geometría"),
-                ui.span("Facetas y estado"),
-                class_="csv-popover-groups",
-            ),
-            ui.p("Si todavía no hay muestras, exporta una sola fila con la lectura actual.", class_="csv-popover-note"),
-            ui.p("No incluye imágenes, el modelo 3D, el mapa de intensidad completo ni resultados individuales de cada faceta.", class_="csv-popover-exclusion"),
-            class_="csv-export-popover",
-        ),
-        class_="csv-export-help",
     )
 
 
@@ -1452,7 +1426,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.6"),
+            ui.h1("Mini horno solar · Web 0.3.7"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),
@@ -1640,11 +1614,7 @@ app_ui = ui.page_fluid(
                 ui.div(
                     ui.input_action_button("toggle_run", "INICIAR SIMULACION", class_="primary-action"),
                     ui.input_action_button("reset", "VOLVER A CONFIGURAR", class_="secondary-action"),
-                    ui.div(
-                        ui.download_button("download_csv", "EXPORTAR HISTORIAL CSV", class_="secondary-action csv-download-action"),
-                        csv_export_help(),
-                        class_="csv-action-cluster",
-                    ),
+                    ui.download_button("download_csv", "EXPORTAR HISTORIAL CSV", class_="secondary-action csv-download-action"),
                     class_="action-row",
                 ),
                 class_="operation-row",

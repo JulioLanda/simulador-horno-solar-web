@@ -1,0 +1,61 @@
+name: Publicar simulador web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Probar núcleo web
+        run: uv run --project web_app python -m unittest web_app.test_engine
+
+      - name: Preparar aplicación Shinylive
+        shell: bash
+        run: |
+          mkdir -p build/digital_twin build/www
+          cp web_app/app.py web_app/engine.py build/
+          cp web_app/www/styles.css build/www/
+          cp digital_twin/*.py build/digital_twin/
+
+      - name: Exportar sitio estático
+        run: uv run --project web_app shinylive export build _site
+
+      - name: Subir sitio para GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

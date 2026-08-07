@@ -746,7 +746,7 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.3.4"),
+            ui.strong("Versión web 0.3.5"),
             ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
@@ -772,6 +772,147 @@ def guide_screen_card(title: str, caption: str, preview: object, badge: str) -> 
         ui.div(preview, ui.span(badge, class_="screen-badge"), class_="screen-preview"),
         ui.div(ui.strong(title), ui.span(caption), class_="screen-card-copy"),
         class_="guide-screen-card",
+    )
+
+
+def csv_export_help() -> object:
+    return ui.tags.details(
+        ui.tags.summary(ui.span("?", class_="csv-help-icon"), ui.span("¿QUÉ GUARDA?")),
+        ui.div(
+            ui.div(
+                ui.span("CSV", class_="csv-popover-mark"),
+                ui.div(ui.strong("Historial de la sesión"), ui.span("49 columnas por muestra")),
+                class_="csv-popover-title",
+            ),
+            ui.p("Registra una fila aproximadamente cada 0.5 segundos mientras la sesión está en marcha, hasta 1,200 filas."),
+            ui.div(
+                ui.span("Tiempo y modo"),
+                ui.span("AZ / EL y óptica"),
+                ui.span("Impacto u / v / r"),
+                ui.span("Geometría"),
+                ui.span("Facetas y estado"),
+                class_="csv-popover-groups",
+            ),
+            ui.p("Si todavía no hay muestras, exporta una sola fila con la lectura actual.", class_="csv-popover-note"),
+            ui.p("No incluye imágenes, el modelo 3D, el mapa de intensidad completo ni resultados individuales de cada faceta.", class_="csv-popover-exclusion"),
+            class_="csv-export-popover",
+        ),
+        class_="csv-export-help",
+    )
+
+
+def csv_guide_panel() -> object:
+    column_groups = (
+        (
+            "01",
+            "Sesión y tiempo",
+            "7 columnas",
+            "Versión, fecha/hora, tipo y escala de reloj, modo, ejecución e iteraciones.",
+            "simulator_version · timestamp · time_mode · time_scale · mode · running · iterations",
+            "blue",
+        ),
+        (
+            "02",
+            "Seguimiento y óptica",
+            "21 columnas",
+            "Pose y objetivo AZ/EL, errores, correcciones, Sol, incidencia, reflexión, distancia e impacto.",
+            "az_deg · el_deg · az_target_deg · el_target_deg · az_error_deg · el_error_deg · effective_az_error_deg · effective_el_error_deg · correction_az_deg · correction_el_deg · zenith_deg · altitude_deg · solar_azimuth_deg · incidence_deg · reflection_deg · target_difference_deg · ray_distance_m · spot_valid · spot_u_mm · spot_v_mm · spot_radial_mm",
+            "teal",
+        ),
+        (
+            "03",
+            "Geometría",
+            "6 columnas",
+            "Tamaños principales del heliostato, riel, receptor y tolerancia del target.",
+            "mirror_size_m · base_width_m · fork_height_m · rail_length_m · receiver_screen_m · target_tolerance_m",
+            "gold",
+        ),
+        (
+            "04",
+            "Facetas y mapa",
+            "13 columnas",
+            "Activación, forma, cantidad, tamaño, separación, foco, selección, desalineación y opciones del mapa.",
+            "facet_enabled · facet_shape · facet_count · facet_size_m · facet_gap_m · facet_focal_distance_m · facet_selected_id · facet_active_count · facet_misalignment_h_deg · facet_misalignment_v_deg · spot_map_enabled · spot_map_resolution · spot_normalization",
+            "red",
+        ),
+        (
+            "05",
+            "Estado",
+            "2 columnas",
+            "Texto del estado operacional y su categoría interna.",
+            "status · status_kind",
+            "green",
+        ),
+    )
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.span("UNA FILA", class_="csv-flow-badge"),
+                ui.strong("Muestra del simulador"),
+                ui.span("≈ cada 0.5 s de tiempo real"),
+                class_="csv-flow-step",
+            ),
+            ui.span("→", class_="csv-flow-arrow"),
+            ui.div(
+                ui.span("49 DATOS", class_="csv-flow-badge"),
+                ui.strong("Estado completo de la muestra"),
+                ui.span("tiempo · seguimiento · spot · geometría"),
+                class_="csv-flow-step",
+            ),
+            ui.span("→", class_="csv-flow-arrow"),
+            ui.div(
+                ui.span("HASTA 1,200", class_="csv-flow-badge"),
+                ui.strong("Historial descargable"),
+                ui.span("las muestras más recientes"),
+                class_="csv-flow-step",
+            ),
+            class_="csv-flow",
+        ),
+        ui.div(
+            ui.div(
+                ui.div(ui.span("timestamp"), ui.span("mode"), ui.span("az_deg"), ui.span("el_deg"), ui.span("spot_u_mm"), ui.span("spot_v_mm"), ui.span("status"), class_="csv-table-row csv-table-head"),
+                ui.div(ui.span("12:00:00"), ui.span("Auto"), ui.span("0.00"), ui.span("90.00"), ui.span("0.00"), ui.span("0.00"), ui.span("EN OBJETIVO"), class_="csv-table-row"),
+                ui.div(ui.span("12:00:30"), ui.span("Auto"), ui.span("0.04"), ui.span("89.97"), ui.span("−1.12"), ui.span("+0.64"), ui.span("MOVIENDO"), class_="csv-table-row"),
+                ui.div(ui.span("12:01:00"), ui.span("Auto"), ui.span("0.08"), ui.span("89.94"), ui.span("−0.21"), ui.span("+0.09"), ui.span("EN OBJETIVO"), class_="csv-table-row"),
+                class_="csv-table",
+            ),
+            ui.div(
+                ui.strong("Ejemplo simplificado"),
+                ui.p("El archivo real contiene 49 columnas. Cada fila es una fotografía numérica del simulador en ese instante; no es una imagen."),
+                ui.div(ui.span("SIN HISTORIAL"), ui.span("Se exporta la lectura actual como una sola fila."), class_="csv-single-row-note"),
+                class_="csv-table-caption",
+            ),
+            class_="csv-table-card",
+        ),
+        ui.div(
+            *(
+                ui.div(
+                    ui.span(number_text, class_="csv-group-number"),
+                    ui.div(ui.strong(title), ui.tags.small(count)),
+                    ui.p(description),
+                    class_=f"csv-group-card csv-group-{tone}",
+                )
+                for number_text, title, count, description, _columns, tone in column_groups
+            ),
+            class_="csv-group-grid",
+        ),
+        ui.tags.details(
+            ui.tags.summary("Ver los nombres exactos de las 49 columnas"),
+            ui.div(
+                *(
+                    ui.div(ui.strong(f"{title} · {count}"), ui.tags.code(columns), class_="csv-column-list")
+                    for _number_text, title, count, _description, columns, _tone in column_groups
+                ),
+                class_="csv-column-lists",
+            ),
+            class_="csv-column-details",
+        ),
+        ui.div(
+            ui.strong("El CSV no guarda"),
+            ui.span("gráficas o capturas · escena 3D · vectores completos S/N/reflejado/target · celdas del mapa de intensidad · resultados por faceta · latitud/longitud/UTC/método solar · RX/RY/RZ · PWM/velocidades · offsets/derivas/ganancia"),
+            class_="csv-not-included",
+        ),
+        class_="csv-guide-panel",
     )
 
 
@@ -823,7 +964,7 @@ def visual_guide_panel() -> object:
                     ui.div(
                         ui.span("INICIAR", class_="anatomy-action primary"),
                         ui.span("CONFIGURAR", class_="anatomy-action"),
-                        ui.span("GUARDAR CSV", class_="anatomy-action"),
+                        ui.span("EXPORTAR CSV", class_="anatomy-action"),
                         class_="anatomy-actions",
                     ),
                     ui.div(ui.span("2"), ui.strong("SESIÓN"), class_="anatomy-zone-label anatomy-zone-two"),
@@ -1038,6 +1179,13 @@ def visual_guide_panel() -> object:
             class_="guide-two-column",
         ),
         ui.div(
+            ui.div("EXPORTACIÓN DE DATOS", class_="guide-section-kicker"),
+            ui.h3("Qué contiene exactamente el archivo CSV"),
+            ui.p("El archivo sirve para analizar la evolución temporal del experimento en una hoja de cálculo o programa estadístico."),
+            class_="guide-section-heading",
+        ),
+        csv_guide_panel(),
+        ui.div(
             ui.div("PRIMEROS EXPERIMENTOS", class_="guide-section-kicker"),
             ui.h3("Cuatro recorridos para entender el modelo"),
             ui.p("En cada tarjeta sigue la secuencia de izquierda a derecha."),
@@ -1075,7 +1223,7 @@ def visual_guide_panel() -> object:
             ),
             manual_chapter(
                 "Diagnóstico, CSV y solución de problemas",
-                ui.p("Diagnóstico muestra error AZ/EL, error del spot, altura solar, incidencia, diferencia reflejado-target, correcciones y vectores. GUARDAR CSV exporta el historial o la lectura actual."),
+                ui.p("Diagnóstico muestra error AZ/EL, error del spot, altura solar, incidencia, diferencia reflejado-target, correcciones y vectores. EXPORTAR HISTORIAL CSV descarga hasta 1,200 muestras; si no existe historial, descarga únicamente la lectura actual."),
                 ui.tags.ul(
                     ui.tags.li("Sin movimiento: inicia la sesión y revisa modo, PWM y límites."),
                     ui.tags.li("Sin spot: confirma que el Sol esté sobre el horizonte y exista intersección frontal."),
@@ -1215,7 +1363,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.4"),
+            ui.h1("Mini horno solar · Web 0.3.5"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),
@@ -1403,7 +1551,11 @@ app_ui = ui.page_fluid(
                 ui.div(
                     ui.input_action_button("toggle_run", "INICIAR SIMULACION", class_="primary-action"),
                     ui.input_action_button("reset", "VOLVER A CONFIGURAR", class_="secondary-action"),
-                    ui.download_button("download_csv", "GUARDAR CSV", class_="secondary-action"),
+                    ui.div(
+                        ui.download_button("download_csv", "EXPORTAR HISTORIAL CSV", class_="secondary-action csv-download-action"),
+                        csv_export_help(),
+                        class_="csv-action-cluster",
+                    ),
                     class_="action-row",
                 ),
                 class_="operation-row",

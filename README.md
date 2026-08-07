@@ -1,4 +1,4 @@
-# Simulador web del mini horno solar 0.3.1
+# Simulador web del mini horno solar 0.3.2
 
 Edición web experimental y sin servidor del gemelo digital del mini horno
 solar. El simulador se ejecuta directamente en el navegador mediante

@@ -746,111 +746,296 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.3.1"),
-            ui.span("Manual visual y referencia matemática integrados."),
+            ui.strong("Versión web 0.3.2"),
+            ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
         class_="manual-panel about-panel",
     )
 
 
-def manual_panel() -> object:
-    guide = ui.div(
+def guide_stage(number_text: str, icon: str, title: str, caption: str, tone: str) -> object:
+    return ui.div(
         ui.div(
-            ui.div("MANUAL DE USUARIO", class_="manual-kicker"),
-            ui.h2("Gemelo digital del mini horno solar · edición web"),
-            ui.p(
-                "Guía completa de configuración, operación, interpretación y experimentos. "
-                "Todos los cálculos se ejecutan localmente en el navegador; la aplicación no controla hardware físico.",
-            ),
-            class_="manual-hero",
+            ui.span(number_text, class_="guide-stage-number"),
+            ui.span(icon, class_="guide-stage-icon", **{"aria-hidden": "true"}),
+            class_="guide-stage-top",
         ),
-        manual_chapter(
-            "1. Inicio rápido",
-            ui.tags.ol(
-                ui.tags.li("Elige Tiempo real o Fecha simulada y configura el reloj."),
-                ui.tags.li("Carga Minihorno IER o escribe las dimensiones de tu diseño."),
-                ui.tags.li("Selecciona Automático, Manual o Home y ajusta motores, errores y facetas."),
-                ui.tags.li("Pulsa INICIAR SIMULACIÓN. La configuración puede prepararse antes de iniciar."),
-                ui.tags.li("Revisa las pestañas y guarda las muestras con GUARDAR CSV."),
-            ),
-            opened=True,
-        ),
-        manual_chapter(
-            "2. Controles principales y estados",
-            ui.p("INICIAR SIMULACIÓN comienza una sesión. PAUSAR congela reloj y movimiento. REANUDAR continúa la misma sesión. VOLVER A CONFIGURAR detiene la sesión, devuelve el heliostato a 0°/90° y conserva los valores escritos en los controles."),
-            ui.p("Los estados principales son: listo para configurar, simulación pausada, moviendo al objetivo, en objetivo, Sol bajo el horizonte y sin impacto frontal. El estado y los objetivos AZ/EL aparecen siempre sobre las pestañas."),
-        ),
-        manual_chapter(
-            "3. Tiempo real y fecha simulada",
-            ui.p("Tiempo real usa la hora civil del equipo con el desfase UTC configurado. Fecha simulada usa el día y hora elegidos; APLICAR FECHA Y HORA fija el origen y la velocidad multiplica únicamente el avance del reloj solar."),
-            ui.p("La posición solar usa latitud, longitud, desfase UTC y el método seleccionado. La simulación no comienza automáticamente al cambiar estos parámetros."),
-        ),
-        manual_chapter(
-            "4. Modos de operación",
-            ui.p("Automático calcula la normal ideal y mueve ambos ejes gradualmente hacia el objetivo cuando Seguimiento solar está activo. Manual modifica los objetivos con Oeste/Este y Bajar/Subir; el paso se expresa en grados. Home solicita un retorno gradual a AZ 0° y EL 90°."),
-            ui.p("PWM multiplica la velocidad máxima de cada eje. Cambiar de modo nunca teletransporta el heliostato: parte desde la pose actual."),
-        ),
-        manual_chapter(
-            "5. Calibración y perfiles",
-            ui.p("Minihorno IER restaura ubicación, target, espejo, base, horquilla, riel, pantalla, tolerancia, límites, velocidades y geometría de facetas. Diseño propio permite conservar los valores escritos por el usuario."),
-            ui.p("RX, RY y RZ son coordenadas en metros desde el centro óptico del espejo. X es oeste positivo, Y es sur positivo y Z es cenit positivo. Todas las dimensiones se interpretan directamente en metros, sin factores de escala ocultos."),
-        ),
-        manual_chapter(
-            "6. Gemelo 3D",
-            ui.p("Isométrica, Frontal, Lateral y Superior restablecen vistas fijas. En cámara libre, el clic izquierdo desplaza, el clic derecho gira y la rueda controla el zoom. La tarjeta de orientación muestra los ejes locales."),
-            ui.p("El espejo, la base, el receptor, el riel y los vectores se actualizan con el estado. Si las facetas están activas, las activas aparecen doradas, las inactivas grises y los rayos centrales se dibujan hacia el plano receptor."),
-        ),
-        manual_chapter(
-            "7. Pantalla / spot",
-            ui.p("El plano receptor usa u horizontal, positivo hacia el oeste, y v vertical, positivo hacia el cenit. El círculo verde es la tolerancia. Error radial es la distancia entre el impacto calculado y el centro nominal."),
-            ui.p("La ley utilizada es dr = di − 2(di · N)N. Después se intersecta el rayo con el plano que pasa por R. Si el cruce queda detrás del origen o el rayo es paralelo, el impacto se marca como no válido."),
-        ),
-        manual_chapter(
-            "8. Trayectoria solar",
-            ui.p("La gráfica recorre el día activo: X es acimut de laboratorio, donde este es negativo, sur es 0° y oeste es positivo; Y es altura solar entre 0° y 90°. El punto actual corresponde al reloj del experimento."),
-        ),
-        manual_chapter(
-            "9. Facetas, rayos e intensidad",
-            ui.p("Forma admite cuadrada, circular y hexagonal. Cantidad genera un acomodo compacto y centrado. Tamaño significa lado, diámetro o ancho entre caras, respectivamente. Separación agrega espacio libre y Focal fija la distancia del concentrador al plano receptor."),
-            ui.p("Selecciona un ID como F5 para aplicarle desalineación horizontal o vertical. ACTIVAR/DESACTIVAR SELECCIONADA controla su contribución; TODAS ON/OFF opera sobre el conjunto completo."),
-            ui.p("Resumen, Superior X-Y, Lateral Y-Z y 3D isométrica cambian la proyección del trazado. Vista general reúne esquema, receptor y tabla; los otros modos amplían un panel."),
-            ui.p("El mapa suma manchas gaussianas por faceta. Sigma base controla su dispersión, Rango fija el plano visible, Resolución debe ser impar entre 21 y 121 y Normalización puede conservar el total, el pico o los valores sin normalizar. Centroide, diámetro equivalente, sigmas y orientación describen el spot combinado."),
-        ),
-        manual_chapter(
-            "10. Deriva y corrección",
-            ui.p("Offset aplica un error angular fijo; deriva crece en grados por hora del experimento. CORREGIR AHORA aproxima gradualmente la compensación al error observado según la ganancia. Una ganancia de 50 % elimina la mitad del error restante en cada pulsación."),
-        ),
-        manual_chapter(
-            "11. Diagnóstico y exportación",
-            ui.p("Diagnóstico muestra error AZ/EL, error del spot, altura solar, incidencia, diferencia reflejado-target, correcciones y vectores. GUARDAR CSV exporta el historial; si aún no hay muestras exporta la lectura actual."),
-            ui.p("Para comparar experimentos cambia una familia de variables por vez y registra perfil, reloj, modo, errores, facetas, normalización y resolución."),
-        ),
-        manual_chapter(
-            "12. Experimentos sugeridos",
-            ui.tags.ul(
-                ui.tags.li("Seguimiento nominal: Minihorno IER, fecha simulada al mediodía, Automático y sin errores."),
-                ui.tags.li("Transitorio: parte desde una pose Manual, cambia a Automático y observa el movimiento gradual."),
-                ui.tags.li("Deriva: aplica 0.2 deg/h, acelera el reloj y compara el error antes y después de varias correcciones."),
-                ui.tags.li("Facetas: activa el mapa, desalinea F1, compara impactos y después desactiva F1."),
-                ui.tags.li("Geometría propia: modifica target y dimensiones, revisa la escena 3D y exporta el resultado."),
-            ),
-        ),
-        manual_chapter(
-            "13. Solución de problemas y límites",
-            ui.tags.ul(
-                ui.tags.li("Sin movimiento: inicia la sesión, revisa el modo, el PWM y los límites configurados."),
-                ui.tags.li("Sin spot: confirma que el Sol esté sobre el horizonte y que el rayo cruce frontalmente el receptor."),
-                ui.tags.li("Sin mapa: activa modelo, mapa y al menos una faceta; aumenta el rango si los impactos quedan fuera."),
-                ui.tags.li("Rendimiento lento: reduce cantidad de facetas o resolución del mapa."),
-                ui.tags.li("La web es un simulador didáctico geométrico; no incluye sombras, clima, deformación térmica, potencia radiométrica absoluta ni control GPIO/serial."),
-            ),
-        ),
-        class_="manual-panel",
+        ui.strong(title),
+        ui.span(caption),
+        class_=f"guide-stage guide-stage-{tone}",
     )
+
+
+def guide_screen_card(title: str, caption: str, preview: object, badge: str) -> object:
+    return ui.div(
+        ui.div(preview, ui.span(badge, class_="screen-badge"), class_="screen-preview"),
+        ui.div(ui.strong(title), ui.span(caption), class_="screen-card-copy"),
+        class_="guide-screen-card",
+    )
+
+
+def visual_guide_panel() -> object:
+    interface_map = ui.div(
+        ui.div(
+            ui.span("GEMELO DIGITAL", class_="map-brand"),
+            ui.span("RELOJ DEL EXPERIMENTO", class_="map-clock"),
+            class_="map-header",
+        ),
+        ui.div(
+            ui.div(
+                ui.span("1", class_="map-pin"),
+                ui.strong("CONFIGURACIÓN"),
+                ui.span("Modo · tiempo · calibración · facetas"),
+                class_="map-sidebar",
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("2", class_="map-pin"),
+                    ui.strong("CONTROLES DE SESIÓN"),
+                    class_="map-toolbar",
+                ),
+                ui.div(
+                    ui.span("3", class_="map-pin"),
+                    ui.div("PESTAÑAS DE RESULTADOS", class_="map-tabs"),
+                    ui.div(
+                        ui.span(class_="map-sun"),
+                        ui.span(class_="map-ray map-ray-one"),
+                        ui.span(class_="map-ray map-ray-two"),
+                        ui.span(class_="map-mirror"),
+                        ui.span(class_="map-receiver"),
+                        class_="map-scene-art",
+                    ),
+                    class_="map-workspace",
+                ),
+                ui.div(
+                    ui.span("4", class_="map-pin"),
+                    ui.strong("LECTURAS Y ESTADO"),
+                    class_="map-readouts",
+                ),
+                class_="map-main",
+            ),
+            class_="map-body",
+        ),
+        class_="guide-interface-map",
+        **{"aria-label": "Mapa visual de las zonas principales de la aplicación"},
+    )
+
+    screen_cards = (
+        guide_screen_card(
+            "Gemelo 3D",
+            "Comprueba pose, orientación y trayectoria óptica.",
+            ui.div(
+                ui.span(class_="mini-sun"),
+                ui.span(class_="mini-ray mini-ray-in"),
+                ui.span(class_="mini-mirror"),
+                ui.span(class_="mini-ray mini-ray-out"),
+                ui.span(class_="mini-target"),
+                ui.span(class_="mini-ground"),
+                class_="preview-3d",
+            ),
+            "MOVER · GIRAR · ZOOM",
+        ),
+        guide_screen_card(
+            "Pantalla / spot",
+            "Lee u, v y la distancia radial al centro.",
+            ui.div(
+                ui.span("v", class_="target-v"),
+                ui.span("u", class_="target-u"),
+                ui.span(class_="target-ring"),
+                ui.span(class_="target-center"),
+                ui.span(class_="target-hit"),
+                ui.span("r", class_="target-radius-label"),
+                class_="preview-target",
+            ),
+            "CENTRO · TOLERANCIA · IMPACTO",
+        ),
+        guide_screen_card(
+            "Trayectoria solar",
+            "Relaciona la hora con el acimut y la altura del Sol.",
+            ui.div(
+                *(ui.span(class_=f"solar-dot solar-dot-{index}") for index in range(1, 10)),
+                ui.span(class_="solar-now"),
+                ui.span("altura", class_="solar-axis-y"),
+                ui.span("acimut", class_="solar-axis-x"),
+                class_="preview-solar",
+            ),
+            "ACIMUT ↔ ALTURA",
+        ),
+        guide_screen_card(
+            "Facetas",
+            "Compara acomodo, rayos, impactos e intensidad.",
+            ui.div(
+                ui.div(*(ui.span(str(index)) for index in range(1, 8)), class_="facet-cluster"),
+                ui.div(*(ui.span(class_=f"heat-cell heat-{index}") for index in range(1, 10)), class_="heat-grid"),
+                class_="preview-facets",
+            ),
+            "GEOMETRÍA + MAPA",
+        ),
+        guide_screen_card(
+            "Deriva y corrección",
+            "Observa el error acumulado y su convergencia.",
+            ui.div(
+                ui.span(class_="drift-zero"),
+                *(ui.span(class_=f"drift-bar drift-bar-{index}") for index in range(1, 8)),
+                ui.span("CORREGIR", class_="drift-action"),
+                class_="preview-drift",
+            ),
+            "ERROR → CORRECCIÓN",
+        ),
+        guide_screen_card(
+            "Diagnóstico",
+            "Confirma estado, motores y calidad del seguimiento.",
+            ui.div(
+                ui.div(ui.span("AZ"), ui.strong("0.03°"), ui.span(class_="diag-good")),
+                ui.div(ui.span("EL"), ui.strong("−0.07°"), ui.span(class_="diag-good")),
+                ui.div(ui.span("SPOT"), ui.strong("11.18 mm"), ui.span(class_="diag-warn")),
+                class_="preview-diagnostics",
+            ),
+            "ESTADO OPERACIONAL",
+        ),
+    )
+
+    target_demo = ui.div(
+        ui.div(
+            ui.span("+v · cenit", class_="demo-v-label"),
+            ui.span("+u · oeste", class_="demo-u-label"),
+            ui.span(class_="demo-axis demo-axis-h"),
+            ui.span(class_="demo-axis demo-axis-v"),
+            ui.span(class_="demo-tolerance"),
+            ui.span(class_="demo-center"),
+            ui.span(class_="demo-impact"),
+            ui.span(class_="demo-radius"),
+            ui.span("impacto", class_="demo-impact-label"),
+            class_="target-demo",
+        ),
+        ui.div(
+            ui.div(ui.strong("u"), ui.span("desplazamiento horizontal"), class_="target-reading target-reading-blue"),
+            ui.div(ui.strong("v"), ui.span("desplazamiento vertical"), class_="target-reading target-reading-teal"),
+            ui.div(ui.strong("r"), ui.span("distancia total al centro"), class_="target-reading target-reading-red"),
+            ui.div(ui.span(class_="status-dot status-green"), ui.span("Dentro del círculo: en tolerancia"), class_="target-legend"),
+            ui.div(ui.span(class_="status-dot status-red"), ui.span("Fuera del círculo: revisar seguimiento"), class_="target-legend"),
+            class_="target-demo-copy",
+        ),
+        class_="target-demo-layout",
+    )
+
+    return ui.div(
+        ui.div(
+            ui.div("GUÍA VISUAL", class_="manual-kicker"),
+            ui.h2("Aprende el simulador siguiendo la imagen"),
+            ui.p("Ubica cada zona, reconoce qué debes observar y realiza tus primeras pruebas con recorridos cortos."),
+            class_="manual-hero guide-hero",
+        ),
+        ui.div(
+            guide_stage("01", "◷", "Elige el tiempo", "Tiempo real o una fecha simulada.", "blue"),
+            guide_stage("02", "☷", "Configura", "Perfil, geometría, modo y errores.", "teal"),
+            guide_stage("03", "▶", "Inicia", "Los cálculos comienzan solo al pulsar.", "green"),
+            guide_stage("04", "◎", "Observa", "3D, spot, facetas y diagnóstico.", "gold"),
+            guide_stage("05", "⇩", "Compara", "Corrige, repite y guarda CSV.", "red"),
+            class_="guide-stages",
+        ),
+        ui.div(
+            ui.div("MAPA DE LA APLICACIÓN", class_="guide-section-kicker"),
+            ui.h3("Cuatro zonas que siempre cumplen la misma función"),
+            ui.p("Los números del esquema corresponden a las tarjetas de lectura."),
+            class_="guide-section-heading",
+        ),
+        ui.div(
+            interface_map,
+            ui.div(
+                ui.div(ui.span("1"), ui.strong("Preparar"), ui.tags.small("Edita todos los parámetros antes de iniciar."), class_="map-legend-item"),
+                ui.div(ui.span("2"), ui.strong("Controlar"), ui.tags.small("Inicia, pausa, reanuda o vuelve a configurar."), class_="map-legend-item"),
+                ui.div(ui.span("3"), ui.strong("Explorar"), ui.tags.small("Cada pestaña muestra una parte del mismo cálculo."), class_="map-legend-item"),
+                ui.div(ui.span("4"), ui.strong("Confirmar"), ui.tags.small("Comprueba el estado y los valores esenciales."), class_="map-legend-item"),
+                class_="map-legend",
+            ),
+            class_="interface-map-layout",
+        ),
+        ui.div(
+            ui.div("PESTAÑAS DE RESULTADOS", class_="guide-section-kicker"),
+            ui.h3("Qué debes mirar en cada pantalla"),
+            ui.p("Estas miniaturas usan los mismos colores y conceptos del simulador."),
+            class_="guide-section-heading",
+        ),
+        ui.div(*screen_cards, class_="guide-screen-grid"),
+        ui.div(
+            ui.div(
+                ui.div("CONTROLES ESENCIALES", class_="guide-section-kicker"),
+                ui.h3("La sesión se maneja con cuatro acciones"),
+                ui.div(
+                    ui.div(ui.span("▶", class_="control-symbol"), ui.strong("INICIAR"), ui.tags.small("Comienza con los parámetros preparados."), class_="control-demo control-start"),
+                    ui.div(ui.span("Ⅱ", class_="control-symbol"), ui.strong("PAUSAR"), ui.tags.small("Congela reloj y movimiento."), class_="control-demo control-pause"),
+                    ui.div(ui.span("↻", class_="control-symbol"), ui.strong("REANUDAR"), ui.tags.small("Continúa la misma sesión."), class_="control-demo control-resume"),
+                    ui.div(ui.span("⚙", class_="control-symbol"), ui.strong("CONFIGURAR"), ui.tags.small("Detiene y permite nuevos ajustes."), class_="control-demo control-config"),
+                    class_="control-demo-grid",
+                ),
+                class_="guide-controls-block",
+            ),
+            ui.div(
+                ui.div("LECTURA DEL RECEPTOR", class_="guide-section-kicker"),
+                ui.h3("El centro ideal es el origen u = 0, v = 0"),
+                target_demo,
+                class_="guide-target-block",
+            ),
+            class_="guide-two-column",
+        ),
+        ui.div(
+            ui.div("PRIMEROS EXPERIMENTOS", class_="guide-section-kicker"),
+            ui.h3("Cuatro recorridos para entender el modelo"),
+            ui.p("En cada tarjeta sigue la secuencia de izquierda a derecha."),
+            class_="guide-section-heading",
+        ),
+        ui.div(
+            ui.div(ui.span("01", class_="experiment-number"), ui.strong("Seguimiento nominal"), ui.div(ui.span("Minihorno IER"), ui.span("12:00"), ui.span("Automático"), class_="experiment-inputs"), ui.div("INICIAR", class_="experiment-arrow"), ui.p("El spot debe permanecer cerca del centro."), class_="experiment-card experiment-green"),
+            ui.div(ui.span("02", class_="experiment-number"), ui.strong("Transitorio de movimiento"), ui.div(ui.span("Manual"), ui.span("Mover AZ/EL"), ui.span("Automático"), class_="experiment-inputs"), ui.div("OBSERVAR", class_="experiment-arrow"), ui.p("La pose viaja gradualmente al objetivo."), class_="experiment-card experiment-blue"),
+            ui.div(ui.span("03", class_="experiment-number"), ui.strong("Deriva y corrección"), ui.div(ui.span("0.2°/h"), ui.span("Tiempo ×60"), ui.span("Corregir"), class_="experiment-inputs"), ui.div("COMPARAR", class_="experiment-arrow"), ui.p("Cada pulsación reduce una fracción del error."), class_="experiment-card experiment-gold"),
+            ui.div(ui.span("04", class_="experiment-number"), ui.strong("Faceta desalineada"), ui.div(ui.span("Facetas ON"), ui.span("Elegir F1"), ui.span("Desalinear"), class_="experiment-inputs"), ui.div("ANALIZAR", class_="experiment-arrow"), ui.p("Compara el impacto y el mapa de intensidad."), class_="experiment-card experiment-red"),
+            class_="experiment-board",
+        ),
+        ui.div(
+            ui.div("REFERENCIA COMPLETA", class_="guide-section-kicker"),
+            ui.h3("Detalles para cuando necesites profundizar"),
+            ui.p("La guía principal termina aquí. Abre solo el tema que quieras consultar."),
+            class_="guide-section-heading reference-heading",
+        ),
+        ui.div(
+            manual_chapter(
+                "Operación, reloj y modos",
+                ui.p("INICIAR comienza una sesión. PAUSAR congela reloj y movimiento. REANUDAR continúa la misma sesión. VOLVER A CONFIGURAR detiene la sesión, devuelve el heliostato a 0°/90° y conserva los valores escritos."),
+                ui.p("Tiempo real usa la hora civil del equipo. Fecha simulada usa el día, hora, zona UTC y multiplicador elegidos. Automático sigue el objetivo; Manual usa Oeste/Este y Bajar/Subir; Home regresa gradualmente a AZ 0° y EL 90°. PWM multiplica la velocidad máxima."),
+            ),
+            manual_chapter(
+                "Calibración, geometría y cámara 3D",
+                ui.p("Minihorno IER restaura la geometría precargada; Diseño propio conserva tus medidas. RX, RY y RZ se expresan en metros desde el centro óptico: +X oeste, +Y sur, +Z cenit."),
+                ui.p("Las vistas fijas restablecen la cámara. En vista libre, clic izquierdo desplaza, clic derecho gira y la rueda controla el zoom. El espejo, base, receptor, riel y vectores se actualizan con el estado."),
+            ),
+            manual_chapter(
+                "Spot, facetas, intensidad y corrección",
+                ui.p("En el receptor, u es horizontal hacia el oeste, v vertical hacia el cenit y r la distancia radial. El círculo verde representa la tolerancia."),
+                ui.p("Forma admite cuadrada, circular y hexagonal. Cantidad crea un acomodo compacto. Tamaño significa lado, diámetro o ancho entre caras. Puedes desalinear o desactivar una faceta y comparar su impacto en el mapa."),
+                ui.p("Offset es fijo; deriva crece por hora del experimento. CORREGIR AHORA aplica la ganancia al error restante y converge progresivamente."),
+            ),
+            manual_chapter(
+                "Diagnóstico, CSV y solución de problemas",
+                ui.p("Diagnóstico muestra error AZ/EL, error del spot, altura solar, incidencia, diferencia reflejado-target, correcciones y vectores. GUARDAR CSV exporta el historial o la lectura actual."),
+                ui.tags.ul(
+                    ui.tags.li("Sin movimiento: inicia la sesión y revisa modo, PWM y límites."),
+                    ui.tags.li("Sin spot: confirma que el Sol esté sobre el horizonte y exista intersección frontal."),
+                    ui.tags.li("Sin mapa: activa modelo, mapa y al menos una faceta; revisa el rango."),
+                    ui.tags.li("Rendimiento lento: reduce facetas o resolución del mapa."),
+                ),
+            ),
+            class_="manual-reference-grid",
+        ),
+        class_="manual-panel visual-guide-panel",
+    )
+
+
+def manual_panel() -> object:
     return ui.div(
         ui.navset_card_tab(
-            ui.nav_panel("Guía visual", guide),
+            ui.nav_panel("Guía visual", visual_guide_panel()),
             ui.nav_panel("Matemáticas", mathematics_panel()),
             ui.nav_panel("Acerca de", about_panel()),
             id="manual_section",
@@ -973,7 +1158,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.3.1"),
+            ui.h1("Mini horno solar · Web 0.3.2"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),

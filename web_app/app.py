@@ -392,7 +392,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.2.2"),
+            ui.h1("Mini horno solar · Web 0.2.3"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),

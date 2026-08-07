@@ -116,7 +116,6 @@ function addHeliostat(group, state) {
   const forkSpread = mirrorSize * 0.58;
   group.add(cylinderBetween(new THREE.Vector3(-forkSpread, -0.18, 0), new THREE.Vector3(-forkSpread, 0.24, 0), 0.035, COLORS.steel));
   group.add(cylinderBetween(new THREE.Vector3(forkSpread, -0.18, 0), new THREE.Vector3(forkSpread, 0.24, 0), 0.035, COLORS.steel));
-  group.add(cylinderBetween(new THREE.Vector3(-forkSpread, 0.22, 0), new THREE.Vector3(forkSpread, 0.22, 0), 0.035, COLORS.steel));
 
   const mirror = new THREE.Mesh(
     new THREE.BoxGeometry(mirrorSize, mirrorSize, Math.max(0.025, mirrorSize * 0.018)),

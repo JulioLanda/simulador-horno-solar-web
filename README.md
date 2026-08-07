@@ -1,4 +1,4 @@
-# Simulador web del mini horno solar 0.2.1
+# Simulador web del mini horno solar 0.2.2
 
 Edición web experimental y sin servidor del gemelo digital del mini horno
 solar. El simulador se ejecuta directamente en el navegador mediante
@@ -45,7 +45,6 @@ Copy-Item web_app/app.py, web_app/engine.py build/
 Copy-Item web_app/www/* build/www/
 Copy-Item digital_twin/*.py build/digital_twin/
 uv run --project web_app shinylive export build _site
-Copy-Item web_app/www/twin3d.js _site/twin3d.js
 ```
 
 ## Validación

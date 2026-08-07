@@ -361,6 +361,9 @@ function updateFromPayload() {
 const observer = new MutationObserver(() => queueMicrotask(updateFromPayload));
 observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 window.addEventListener("DOMContentLoaded", updateFromPayload);
+queueMicrotask(updateFromPayload);
+window.setTimeout(updateFromPayload, 500);
+window.setTimeout(updateFromPayload, 1500);
 window.addEventListener("beforeunload", () => {
   if (animationFrame) cancelAnimationFrame(animationFrame);
   resizeObserver?.disconnect();

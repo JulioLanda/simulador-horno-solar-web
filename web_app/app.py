@@ -381,14 +381,18 @@ def drift_svg(state: WebTwinState) -> str:
 
 
 app_ui = ui.page_fluid(
-    ui.tags.head(
-        ui.tags.script(src="twin3d.js?v=0.2.1", type="module"),
+    ui.head_content(
+        ui.include_js(
+            APP_DIR / "www" / "twin3d.js",
+            method="inline",
+            type="module",
+        ),
     ),
     ui.include_css(APP_DIR / "www" / "styles.css"),
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.2.1"),
+            ui.h1("Mini horno solar · Web 0.2.2"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),
@@ -758,9 +762,8 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
         sample = state.snapshot()
         sample["revision"] = current_revision
         sample["facets"] = state.facet_layout() if state.facet_enabled else []
-        return ui.tags.script(
-            ui.HTML(json.dumps(json_safe(sample), ensure_ascii=False, allow_nan=False)),
-            type="application/json",
+        return ui.div(
+            json.dumps(json_safe(sample), ensure_ascii=False, allow_nan=False),
             class_="twin-state-payload",
         )
 
@@ -868,7 +871,7 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
         )
 
     @output
-    @render.download(filename=lambda: f"gemelo_web_{state.active_datetime():%Y%m%d_%H%M%S}.csv")
+    @render.download_button(filename=lambda: f"gemelo_web_{state.active_datetime():%Y%m%d_%H%M%S}.csv")
     def download_csv():  # type: ignore[no-untyped-def]
         yield state.export_csv_text()
 

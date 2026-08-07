@@ -1,4 +1,4 @@
-# Simulador web del mini horno solar
+# Simulador web del mini horno solar 0.2
 
 Edición web experimental y sin servidor del gemelo digital del mini horno
 solar. El simulador se ejecuta directamente en el navegador mediante
@@ -17,9 +17,12 @@ Después, los cálculos se realizan localmente en el dispositivo del usuario.
 
 - Reloj en tiempo real o fecha simulada con multiplicador.
 - Modos automático, manual y Home con movimiento gradual.
+- Gemelo 3D WebGL con profundidad, cámara libre y vistas fijas.
+- Click izquierdo para desplazar, click derecho para girar y rueda para zoom.
+- Perfil precargado del Minihorno IER y dimensiones personalizables.
 - Posición solar por los métodos D&B y REDA.
 - Cálculo de normal, reflexión e impacto sobre el receptor.
-- Vistas del gemelo, spot, trayectoria solar, facetas y diagnóstico.
+- Vistas del gemelo, spot, trayectoria solar, facetas, deriva y diagnóstico.
 - Acomodo de facetas cuadradas, circulares y hexagonales.
 - Historial local y descarga en CSV.
 - Interfaz adaptable a computadoras y pantallas angostas.
@@ -39,7 +42,7 @@ uv run --project web_app shiny run web_app/app.py
 ```powershell
 New-Item -ItemType Directory -Force build/digital_twin, build/www
 Copy-Item web_app/app.py, web_app/engine.py build/
-Copy-Item web_app/www/styles.css build/www/
+Copy-Item web_app/www/* build/www/
 Copy-Item digital_twin/*.py build/digital_twin/
 uv run --project web_app shinylive export build _site
 ```
@@ -49,4 +52,3 @@ uv run --project web_app shinylive export build _site
 ```powershell
 uv run --project web_app python -m unittest web_app.test_engine
 ```
-

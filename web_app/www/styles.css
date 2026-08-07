@@ -163,6 +163,57 @@ body {
   padding: 11px 12px 4px;
 }
 
+.control-section-body h4 {
+  margin: 12px 0 8px;
+  padding-bottom: 5px;
+  color: #0f4c5c;
+  border-bottom: 1px solid #cbd5df;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.field-help {
+  margin: -2px 0 10px;
+  color: #5d7181;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.home-note {
+  padding: 9px;
+  background: #e7f1f5;
+  border-left: 3px solid var(--teal-bright);
+  border-radius: 5px;
+}
+
+.jog-row {
+  display: grid;
+  grid-template-columns: 1fr 0.9fr 1fr;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.jog-row.two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.btn.jog-button,
+.btn.stop-button,
+.btn.profile-action {
+  min-height: 34px;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.btn.jog-button { background: #355d7a; }
+.btn.stop-button { background: #9f1239; }
+.btn.profile-action { background: #0f6b78; }
+
 .control-section .form-group,
 .control-section .shiny-input-container {
   width: 100% !important;
@@ -257,6 +308,10 @@ body {
   flex: 0 0 auto;
 }
 
+.action-row > .shiny-bound-output {
+  display: flex;
+}
+
 .btn.primary-action,
 .btn.secondary-action,
 a.secondary-action {
@@ -271,6 +326,16 @@ a.secondary-action {
 .btn.primary-action {
   background: var(--green);
   color: white;
+}
+
+.btn.pause-action {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #b7791f;
+  color: white;
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .btn.primary-action:hover,
@@ -308,9 +373,166 @@ a.secondary-action:focus {
 }
 
 .view-tabs .card-body {
-  min-height: 525px;
+  min-height: 585px;
   padding: 0;
   background: #fff;
+}
+
+.twin-panel {
+  min-height: 585px;
+  background: var(--navy);
+}
+
+.twin-toolbar {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 13px;
+  background: #102638;
+  border-bottom: 1px solid #31536a;
+}
+
+.camera-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.view-button {
+  padding: 7px 11px;
+  border: 1px solid #50718a;
+  border-radius: 6px;
+  background: #18384d;
+  color: #dceef8;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.view-button:hover,
+.view-button:focus {
+  border-color: #f4d35e;
+  color: white;
+}
+
+.camera-help {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: #cce0ec;
+  font-size: 0.7rem;
+}
+
+.camera-help strong {
+  color: #f4d35e;
+  font-size: 0.76rem;
+}
+
+.twin-stage {
+  position: relative;
+  min-height: 527px;
+  height: clamp(527px, 62vh, 720px);
+  overflow: hidden;
+  background: #0b1620;
+}
+
+#twin3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  outline: none;
+}
+
+#twin3d-canvas:active { cursor: grabbing; }
+
+.twin-status,
+.orientation-card,
+.twin-warning {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid #31536a;
+  border-radius: 7px;
+  background: rgba(9, 24, 35, 0.88);
+  color: #dceef8;
+  backdrop-filter: blur(5px);
+}
+
+.twin-status {
+  top: 13px;
+  right: 13px;
+  padding: 8px 11px;
+  font: 700 0.72rem Consolas, monospace;
+}
+
+.orientation-card {
+  left: 13px;
+  bottom: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  font-size: 0.68rem;
+}
+
+.orientation-card strong {
+  color: #f4d35e;
+  text-transform: uppercase;
+}
+
+.twin-warning {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-color: #ef6461;
+  color: #ffd6d5;
+}
+
+.scene-state-host {
+  display: none !important;
+}
+
+.drift-panel {
+  min-height: 585px;
+  background: #f8fafc;
+}
+
+.drift-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  background: #102638;
+  color: white;
+}
+
+.correction-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.correction-readout strong {
+  color: #f4d35e;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.correction-readout span {
+  font: 700 0.82rem Consolas, monospace;
+}
+
+.btn.correction-action {
+  min-height: 37px;
+  border: 0;
+  border-radius: 7px;
+  background: #16834f;
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .nav-tabs .nav-link {
@@ -484,5 +706,20 @@ a.secondary-action:focus {
 
   .sim-svg {
     min-height: 380px;
+  }
+
+  .twin-toolbar,
+  .drift-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .camera-help {
+    align-items: flex-start;
+  }
+
+  .twin-stage {
+    min-height: 430px;
+    height: 58vh;
   }
 }

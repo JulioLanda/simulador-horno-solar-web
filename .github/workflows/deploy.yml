@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p build/digital_twin build/www
           cp web_app/app.py web_app/engine.py build/
-          cp web_app/www/styles.css build/www/
+          cp web_app/www/* build/www/
           cp digital_twin/*.py build/digital_twin/
 
       - name: Exportar sitio estático
@@ -58,4 +58,3 @@ jobs:
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

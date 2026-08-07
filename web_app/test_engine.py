@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import io
 import math
 import unittest
+import zipfile
 
 from web_app.engine import WebTwinState, solar_position_db
 
@@ -90,13 +92,58 @@ class WebTwinEngineTests(unittest.TestCase):
         self.assertEqual(state.az_target_deg, 15.0)
 
     def test_observed_correction_is_incremental(self) -> None:
-        state = WebTwinState(az_offset_deg=1.0, el_offset_deg=-0.5, correction_gain=0.5)
+        state = WebTwinState(correction_gain=0.5, time_mode="Fecha simulada")
+        geometry = state._solar_geometry()
+        state.az_angle_deg = float(geometry["ideal_az_deg"])
+        state.el_angle_deg = float(geometry["ideal_el_deg"])
+        state.error_config.enable_azimuth_offset = True
+        state.error_config.azimuth_offset_deg = 0.25
+        before = float(state._solar_geometry()["corrected_spot_radial_m"])
         state.apply_observed_correction()
-        self.assertAlmostEqual(state.correction_az_deg, -0.5)
-        self.assertAlmostEqual(state.correction_el_deg, 0.25)
+        first = float(state._solar_geometry()["corrected_spot_radial_m"])
         state.apply_observed_correction()
-        self.assertAlmostEqual(state.correction_az_deg, -0.75)
-        self.assertAlmostEqual(state.correction_el_deg, 0.375)
+        second = float(state._solar_geometry()["corrected_spot_radial_m"])
+        self.assertLess(first, before)
+        self.assertLess(second, first)
+
+    def test_error_scenarios_are_computed_in_parallel(self) -> None:
+        state = WebTwinState(time_mode="Fecha simulada")
+        geometry = state._solar_geometry()
+        state.az_angle_deg = float(geometry["ideal_az_deg"])
+        state.el_angle_deg = float(geometry["ideal_el_deg"])
+        state.error_config.enable_elevation_offset = True
+        state.error_config.elevation_offset_deg = 0.4
+        sample = state.snapshot()
+        self.assertLess(float(sample["ideal_spot_radial_mm"]), 1e-6)
+        self.assertGreater(float(sample["error_spot_radial_mm"]), 1.0)
+
+    def test_tracking_schedule_holds_target_between_updates(self) -> None:
+        state = WebTwinState(
+            time_mode="Fecha simulada",
+            time_scale=60.0,
+            running=True,
+            session_started=True,
+            tracking_update_interval_s=60.0,
+        )
+        state.step(0.1)
+        held = (state.az_target_deg, state.el_target_deg)
+        state.step(0.1)
+        self.assertEqual((state.az_target_deg, state.el_target_deg), held)
+        self.assertEqual(state.tracking_update_count, 1)
+        state.step(0.9)
+        self.assertEqual(state.tracking_update_count, 2)
+
+    def test_replay_requires_history_and_cycles_samples(self) -> None:
+        state = WebTwinState(running=True, session_started=True, time_mode="Fecha simulada")
+        self.assertFalse(state.start_replay())
+        state.step(0.5)
+        state.step(0.5)
+        self.assertTrue(state.start_replay())
+        first_timestamp = state.snapshot()["timestamp"]
+        state.step(0.7)
+        self.assertNotEqual(state.snapshot()["timestamp"], first_timestamp)
+        state.stop_replay()
+        self.assertFalse(state.replay_active)
 
     def test_minihorno_profile_keeps_real_world_scale(self) -> None:
         state = WebTwinState()
@@ -134,6 +181,16 @@ class WebTwinEngineTests(unittest.TestCase):
             spot_map_resolution=101,
         )
         self.assertEqual(state.facet_analysis()["spot_map"].resolution, 101)
+
+    def test_experiment_package_contains_history_facets_and_events(self) -> None:
+        state = WebTwinState(facet_enabled=True)
+        payload = state.export_experiment_zip()
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            self.assertEqual(
+                set(archive.namelist()),
+                {"historial.csv", "facetas.csv", "eventos.csv", "LEEME.txt"},
+            )
+            self.assertIn("facet_id", archive.read("facetas.csv").decode("utf-8"))
 
 
 if __name__ == "__main__":

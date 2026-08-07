@@ -219,11 +219,22 @@ function addVectors(group, state) {
   const target = simVector(state.target);
   const incomingStart = origin.clone().add(sun.clone().multiplyScalar(3.2));
 
-  group.add(lineBetween(incomingStart, origin, COLORS.sun, 2));
-  group.add(arrow(incomingStart, sun.clone().negate(), 2.95, COLORS.sun, 0.25));
-  group.add(arrow(origin, normal, 1.35, COLORS.normal, 0.22));
-  group.add(arrow(origin, reflected, Math.min(2.2, Math.max(1.1, target.length() * 0.30)), COLORS.ray, 0.20));
-  group.add(lineBetween(origin, target, COLORS.target, 1, true));
+  if (state.show_sun_vector !== false) {
+    group.add(lineBetween(incomingStart, origin, COLORS.sun, 2));
+    group.add(arrow(incomingStart, sun.clone().negate(), 2.95, COLORS.sun, 0.25));
+  }
+  if (state.show_normal_vector !== false) {
+    group.add(arrow(origin, normal, 1.35, COLORS.normal, 0.22));
+  }
+  if (state.show_reflected_vector !== false) {
+    group.add(arrow(origin, reflected, Math.min(2.2, Math.max(1.1, target.length() * 0.30)), COLORS.ray, 0.20));
+  }
+  if (state.show_target_direction !== false && target.lengthSq() > 1e-8) {
+    group.add(arrow(origin, target.clone().normalize(), 1.45, COLORS.target, 0.18));
+  }
+  if (state.show_target_line !== false) {
+    group.add(lineBetween(origin, target, COLORS.target, 1, true));
+  }
 }
 
 function addOrientationAxes(group, groundY) {
@@ -231,6 +242,32 @@ function addOrientationAxes(group, groundY) {
   group.add(arrow(origin, new THREE.Vector3(1, 0, 0), 1.15, 0xff6b6b, 0.16));
   group.add(arrow(origin, new THREE.Vector3(0, 1, 0), 1.15, 0x8ab4f8, 0.16));
   group.add(arrow(origin, new THREE.Vector3(0, 0, -1), 1.15, 0x65d98b, 0.16));
+}
+
+function addMechanicalGuides(group, state, groundY) {
+  if (state.show_mechanical_guides !== true) return;
+  const material = new THREE.LineDashedMaterial({ color: 0x8ab4f8, dashSize: 0.09, gapSize: 0.06, transparent: true, opacity: 0.75 });
+  const azPoints = [];
+  const azMin = Number(state.az_limit_min_deg ?? -95);
+  const azMax = Number(state.az_limit_max_deg ?? 95);
+  for (let index = 0; index <= 56; index += 1) {
+    const angle = THREE.MathUtils.degToRad(azMin + (azMax - azMin) * index / 56);
+    azPoints.push(new THREE.Vector3(1.35 * Math.sin(angle), groundY + 0.055, -1.35 * Math.cos(angle)));
+  }
+  const azLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(azPoints), material.clone());
+  azLine.computeLineDistances();
+  group.add(azLine);
+
+  const elPoints = [];
+  const elMin = Number(state.el_limit_min_deg ?? 0);
+  const elMax = Number(state.el_limit_max_deg ?? 90);
+  for (let index = 0; index <= 40; index += 1) {
+    const angle = THREE.MathUtils.degToRad(elMin + (elMax - elMin) * index / 40);
+    elPoints.push(new THREE.Vector3(0, 1.1 * Math.sin(angle), -1.1 * Math.cos(angle)));
+  }
+  const elLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(elPoints), material.clone());
+  elLine.computeLineDistances();
+  group.add(elLine);
 }
 
 function rebuild(state) {
@@ -265,6 +302,7 @@ function rebuild(state) {
   addReceiver(dynamicGroup, state);
   addVectors(dynamicGroup, state);
   addOrientationAxes(dynamicGroup, groundY);
+  addMechanicalGuides(dynamicGroup, state, groundY);
   dynamicGroup.traverse((object) => {
     if (object.isMesh) {
       object.castShadow = true;

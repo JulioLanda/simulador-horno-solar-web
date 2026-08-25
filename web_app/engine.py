@@ -16,6 +16,38 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
+    from .physics_adapter import (
+        WebPhysicsRequest,
+        WebScenarioRequest,
+        evaluate_web_physics,
+        solar_method_for_core,
+    )
+    from .physics_core import (
+        AxisCommands,
+        MechanicalLimits,
+        MirrorPose,
+        apply_mechanical_limits,
+        mirror_pose_from_altaz,
+        solar_position,
+    )
+except ImportError:
+    # Shinylive copia los módulos de la aplicación a un único directorio.
+    from physics_adapter import (  # type: ignore[no-redef]
+        WebPhysicsRequest,
+        WebScenarioRequest,
+        evaluate_web_physics,
+        solar_method_for_core,
+    )
+    from physics_core import (  # type: ignore[no-redef]
+        AxisCommands,
+        MechanicalLimits,
+        MirrorPose,
+        apply_mechanical_limits,
+        mirror_pose_from_altaz,
+        solar_position,
+    )
+
+try:
     from digital_twin.facet_model import (
         build_compact_facets,
         dot as facet_dot,
@@ -56,13 +88,16 @@ except ModuleNotFoundError:
 TAU = 2.0 * math.pi
 DEG = math.pi / 180.0
 RAD = 180.0 / math.pi
-WEB_APP_VERSION = "0.4.0"
+WEB_APP_VERSION = "0.5.0"
 
 
 MINIHORNO_WEB_PROFILE = {
     "lat_deg": 18.85,
     "lon_deg": -99.233333,
     "utc_offset_hours": -6.0,
+    "site_altitude_m": 1280.0,
+    "pressure_pa": 101325.0,
+    "temperature_c": 25.0,
     "rx": 0.0,
     "ry": 5.55,
     "rz": -0.40,
@@ -77,9 +112,9 @@ MINIHORNO_WEB_PROFILE = {
     "camera_offset_az_deg": 0.0,
     "camera_offset_el_deg": 0.0,
     "control_delay_s": 0.05,
-    "az_limit_min": -95.0,
-    "az_limit_max": 95.0,
-    "el_limit_min": 0.0,
+    "az_limit_min": -90.0,
+    "az_limit_max": 90.0,
+    "el_limit_min": 10.0,
     "el_limit_max": 90.0,
     "az_deg_per_second": 9.0,
     "el_deg_per_second": 9.0,
@@ -185,33 +220,19 @@ def solar_position_db(
     utc_offset_hours: float,
     method: str = "D&B",
 ) -> tuple[float, float, float]:
-    """Devuelve zenit, altura y acimut de laboratorio en grados."""
-    day = when.timetuple().tm_yday
-    civil_hour = when.hour + when.minute / 60.0 + when.second / 3600.0
-    b = TAU * (day - 81) / 364.0
-    equation_of_time = 9.87 * math.sin(2.0 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
-    if method.upper() == "REDA":
-        equation_of_time += 0.2 * math.sin(TAU * day / 365.0)
-    standard_meridian = 15.0 * clamp(float(utc_offset_hours), -14.0, 14.0)
-    solar_time = civil_hour + (4.0 * (lon_deg - standard_meridian) + equation_of_time) / 60.0
-    hour_angle = 15.0 * (solar_time - 12.0) * DEG
-    declination = 23.45 * DEG * math.sin(TAU * (284 + day) / 365.0)
-    if method.upper() == "REDA":
-        declination += 0.05 * DEG * math.cos(TAU * day / 365.0)
-    latitude = lat_deg * DEG
-    sin_altitude = (
-        math.sin(latitude) * math.sin(declination)
-        + math.cos(latitude) * math.cos(declination) * math.cos(hour_angle)
+    """Mantiene la API histórica delegando el cálculo exacto a ``pvlib``."""
+
+    position = solar_position(
+        when,
+        lat_deg,
+        lon_deg,
+        utc_offset_hours,
+        method=solar_method_for_core(method),
+        altitude_m=MINIHORNO_WEB_PROFILE["site_altitude_m"],
+        pressure_pa=MINIHORNO_WEB_PROFILE["pressure_pa"],
+        temperature_c=MINIHORNO_WEB_PROFILE["temperature_c"],
     )
-    altitude = math.asin(clamp(sin_altitude, -1.0, 1.0))
-    east = -math.cos(declination) * math.sin(hour_angle)
-    north = (
-        math.cos(latitude) * math.sin(declination)
-        - math.sin(latitude) * math.cos(declination) * math.cos(hour_angle)
-    )
-    azimuth = math.atan2(-east, -north) * RAD
-    altitude_deg = altitude * RAD
-    return 90.0 - altitude_deg, altitude_deg, wrap_deg(azimuth)
+    return position.zenith_deg, position.altitude_deg, position.azimuth_deg
 
 
 def target_frame(
@@ -265,6 +286,9 @@ class WebTwinState:
     lat_deg: float = MINIHORNO_WEB_PROFILE["lat_deg"]
     lon_deg: float = MINIHORNO_WEB_PROFILE["lon_deg"]
     utc_offset_hours: float = MINIHORNO_WEB_PROFILE["utc_offset_hours"]
+    site_altitude_m: float = MINIHORNO_WEB_PROFILE["site_altitude_m"]
+    pressure_pa: float = MINIHORNO_WEB_PROFILE["pressure_pa"]
+    temperature_c: float = MINIHORNO_WEB_PROFILE["temperature_c"]
     rx: float = MINIHORNO_WEB_PROFILE["rx"]
     ry: float = MINIHORNO_WEB_PROFILE["ry"]
     rz: float = MINIHORNO_WEB_PROFILE["rz"]
@@ -371,6 +395,9 @@ class WebTwinState:
     _facet_previous_count: int = field(default=9, repr=False)
     _facet_cache_key: tuple[object, ...] | None = field(default=None, repr=False)
     _facet_cache: dict[str, object] | None = field(default=None, repr=False)
+    _scene_pose: MirrorPose | None = field(default=None, repr=False)
+    _active_limit_labels: tuple[str, ...] = field(default=(), repr=False)
+    _last_limit_event_labels: tuple[str, ...] = field(default=(), repr=False)
 
     def __post_init__(self) -> None:
         self._error_model = ErrorModel(self.error_config)
@@ -385,6 +412,9 @@ class WebTwinState:
             "lat_deg",
             "lon_deg",
             "utc_offset_hours",
+            "site_altitude_m",
+            "pressure_pa",
+            "temperature_c",
             "rx",
             "ry",
             "rz",
@@ -552,8 +582,17 @@ class WebTwinState:
     def _apply_tracking_update(self, az_deg: float, el_deg: float) -> None:
         if self.tracking_schedule_initialized:
             self._finish_tracking_interval()
-        self.held_target_az_deg = clamp(az_deg, self.az_limit_min, self.az_limit_max)
-        self.held_target_el_deg = clamp(el_deg, self.el_limit_min, self.el_limit_max)
+        limited = apply_mechanical_limits(
+            AxisCommands(az_deg, el_deg),
+            MechanicalLimits(
+                self.az_limit_min,
+                self.az_limit_max,
+                self.el_limit_min,
+                self.el_limit_max,
+            ),
+        )
+        self.held_target_az_deg = limited.applied.azimuth_deg
+        self.held_target_el_deg = limited.applied.height_deg
         self.motion_error_sample = self._error_model.sample_motion(
             wrap_deg(self.held_target_az_deg - self.az_angle_deg),
             self.held_target_el_deg - self.el_angle_deg,
@@ -566,6 +605,11 @@ class WebTwinState:
             "Seguimiento",
             f"Objetivo actualizado a AZ {self.held_target_az_deg:.3f} deg, EL {self.held_target_el_deg:.3f} deg",
         )
+        if limited.limit_labels:
+            self.add_event(
+                "Limite mecanico",
+                "Objetivo saturado: " + ", ".join(limited.limit_labels),
+            )
 
     def reset_correction(self) -> None:
         self._correction_model.reset()
@@ -686,82 +730,135 @@ class WebTwinState:
         self.add_event("Sesion", "Simulacion en marcha" if self.running else "Simulacion pausada")
 
     def _solar_geometry(self) -> dict[str, object]:
+        """Adapta el estado mutable a la cadena V2 y conserva el contrato web."""
+
         when = self.active_datetime()
-        zenith, altitude, solar_azimuth = solar_position_db(
-            when,
-            self.lat_deg,
-            self.lon_deg,
-            self.utc_offset_hours,
-            self.method,
-        )
-        altitude_rad = altitude * DEG
-        azimuth_rad = solar_azimuth * DEG
-        sun = (
-            math.cos(altitude_rad) * math.sin(azimuth_rad),
-            math.cos(altitude_rad) * math.cos(azimuth_rad),
-            math.sin(altitude_rad),
-        )
         nominal_target = (self.rx, self.ry, self.rz)
-        nominal_target_direction = v_unit(nominal_target)
-        ideal_normal = compute_heliostat_normal(sun, nominal_target_direction)
-        ideal_az_optical, ideal_el_optical = angles_from_normal(ideal_normal)
-        ideal_az = wrap_deg(ideal_az_optical + self.camera_offset_az_deg)
-        ideal_el = ideal_el_optical + self.peralte_deg + self.camera_offset_el_deg
         elapsed_hours = self._elapsed_s / 3600.0
         drift_az = self.drift_az_deg_per_hour * elapsed_hours
         drift_el = self.drift_el_deg_per_hour * elapsed_hours
+        angular_az_error, angular_el_error = self._error_model.angular_errors(
+            self.motion_error_sample,
+            corrected=False,
+        )
+        error_target = self._error_model.effective_target(nominal_target, True)
+        motor_commands = AxisCommands(self.az_angle_deg, self.el_angle_deg)
+        corrected_commands = AxisCommands(
+            self.az_angle_deg + self.correction_az_deg,
+            self.el_angle_deg + self.correction_el_deg,
+        )
+        request = WebPhysicsRequest(
+            when=when,
+            latitude_deg=self.lat_deg,
+            longitude_deg=self.lon_deg,
+            utc_offset_hours=self.utc_offset_hours,
+            receiver_offset=nominal_target,
+            current_motor_commands=motor_commands,
+            scenarios=(
+                WebScenarioRequest("Ideal", motor_commands, nominal_target),
+                WebScenarioRequest(
+                    "Con error",
+                    motor_commands,
+                    error_target,
+                    azimuth_error_deg=angular_az_error + drift_az,
+                    height_error_deg=angular_el_error + drift_el,
+                ),
+                WebScenarioRequest(
+                    "Corregido",
+                    corrected_commands,
+                    error_target,
+                    azimuth_error_deg=angular_az_error + drift_az,
+                    height_error_deg=angular_el_error + drift_el,
+                ),
+            ),
+            selected_scenario=(
+                self.error_mode
+                if self.error_mode in {"Ideal", "Con error", "Corregido"}
+                else "Corregido"
+            ),
+            solar_method=self.method,
+            pivot_height_m=self.fork_height_m,
+            site_altitude_m=self.site_altitude_m,
+            pressure_pa=self.pressure_pa,
+            temperature_c=self.temperature_c,
+            peralte_deg=self.peralte_deg,
+            camera_offset_az_deg=self.camera_offset_az_deg,
+            camera_offset_height_deg=self.camera_offset_el_deg,
+            limits=MechanicalLimits(
+                self.az_limit_min,
+                self.az_limit_max,
+                self.el_limit_min,
+                self.el_limit_max,
+            ),
+            fallback_azimuth_deg=self.az_angle_deg,
+        )
+        adapted = evaluate_web_physics(request)
+        self._scene_pose = adapted.selected.pose
+        self._active_limit_labels = adapted.current_motor_limits.limit_labels
 
-        def scenario(name: str) -> dict[str, object]:
-            uses_errors = name != "Ideal"
-            corrected = name == "Corregido"
-            target = self._error_model.effective_target(nominal_target, uses_errors)
-            command_az = self.az_angle_deg
-            command_el = self.el_angle_deg - self.peralte_deg
-            if uses_errors:
-                command_az += drift_az
-                command_el += drift_el
-            if corrected:
-                command_az += self.correction_az_deg
-                command_el += self.correction_el_deg
-            normal = self._error_model.normal_from_command(
-                command_az,
-                command_el,
-                self.motion_error_sample,
-                include_errors=uses_errors,
-                corrected=False,
-            )
-            reflected = reflect_vector(v_mul(sun, -1.0), normal)
-            valid, impact_u, impact_v, impact_radial, ray_distance = target_impact(reflected, target)
-            target_direction = v_unit(target)
+        def scenario_values(name: str) -> dict[str, object]:
+            scenario = adapted.scenario(name)
+            impact = scenario.impact
+            valid = bool(impact is not None and impact.valid)
             return {
-                "target": target,
-                "target_direction": target_direction,
-                "normal": normal,
-                "reflected": reflected,
+                "target": scenario.target_offset,
+                "target_direction": scenario.target_direction,
+                "normal": scenario.pose.normal,
+                "reflected": scenario.reflected,
                 "spot_valid": valid,
-                "spot_u_m": impact_u,
-                "spot_v_m": impact_v,
-                "spot_radial_m": impact_radial,
-                "ray_distance_m": ray_distance,
-                "incidence_deg": angle_between(sun, normal),
-                "reflection_deg": angle_between(reflected, normal),
-                "target_difference_deg": angle_between(reflected, target_direction),
+                "spot_u_m": (
+                    impact.u_m if impact is not None and impact.u_m is not None else float("nan")
+                ),
+                "spot_v_m": (
+                    impact.v_m if impact is not None and impact.v_m is not None else float("nan")
+                ),
+                "spot_radial_m": (
+                    impact.radial_error_m
+                    if impact is not None and impact.radial_error_m is not None
+                    else float("inf")
+                ),
+                "ray_distance_m": (
+                    impact.ray_parameter_m
+                    if impact is not None and impact.ray_parameter_m is not None
+                    else float("nan")
+                ),
+                "incidence_deg": (
+                    scenario.incidence_deg
+                    if scenario.incidence_deg is not None
+                    else float("nan")
+                ),
+                "reflection_deg": (
+                    scenario.reflection_deg
+                    if scenario.reflection_deg is not None
+                    else float("nan")
+                ),
+                "target_difference_deg": (
+                    scenario.target_difference_deg
+                    if scenario.target_difference_deg is not None
+                    else float("nan")
+                ),
             }
 
-        scenarios = {name: scenario(name) for name in ("Ideal", "Con error", "Corregido")}
-        selected = scenarios.get(self.error_mode, scenarios["Corregido"])
-        actual_normal = selected["normal"]
-        reflected = selected["reflected"]
-        target = selected["target"]
-        target_direction = selected["target_direction"]
-        valid = selected["spot_valid"]
-        impact_u = selected["spot_u_m"]
-        impact_v = selected["spot_v_m"]
-        impact_radial = selected["spot_radial_m"]
-        ray_distance = selected["ray_distance_m"]
-        incidence = angle_between(sun, actual_normal)
-        reflection = angle_between(reflected, actual_normal)
-        target_difference = angle_between(reflected, target_direction)
+        scenarios = {
+            name: scenario_values(name)
+            for name in ("Ideal", "Con error", "Corregido")
+        }
+        selected = scenarios[adapted.selected.name]
+        solar = adapted.ideal_step.solar_position
+        sun = adapted.ideal_step.sun_direction
+        control_targets = adapted.control_targets
+        ideal_az = (
+            control_targets.applied.azimuth_deg
+            if control_targets is not None
+            else self.az_angle_deg
+        )
+        ideal_el = (
+            control_targets.applied.height_deg
+            if control_targets is not None
+            else self.el_angle_deg
+        )
+        target_direction = selected["target_direction"] or v_unit(selected["target"])
+        reflected = selected["reflected"] or (0.0, 0.0, 0.0)
         configured_az_error = (
             (self.error_config.azimuth_offset_deg if self.error_config.enable_azimuth_offset else 0.0)
             + (self.error_config.north_south_misalignment_deg if self.error_config.enable_north_south_misalignment else 0.0)
@@ -772,25 +869,25 @@ class WebTwinState:
         )
         return {
             "when": when,
-            "zenith_deg": zenith,
-            "altitude_deg": altitude,
-            "solar_azimuth_deg": solar_azimuth,
+            "zenith_deg": solar.zenith_deg,
+            "altitude_deg": solar.altitude_deg,
+            "solar_azimuth_deg": solar.azimuth_deg,
             "sun": sun,
-            "target": target,
+            "target": selected["target"],
             "target_direction": target_direction,
-            "ideal_normal": ideal_normal,
+            "ideal_normal": adapted.ideal_step.ideal_normal or adapted.selected.pose.normal,
             "ideal_az_deg": ideal_az,
             "ideal_el_deg": ideal_el,
-            "actual_normal": actual_normal,
+            "actual_normal": adapted.selected.pose.normal,
             "reflected": reflected,
-            "spot_valid": valid,
-            "spot_u_m": impact_u,
-            "spot_v_m": impact_v,
-            "spot_radial_m": impact_radial,
-            "ray_distance_m": ray_distance,
-            "incidence_deg": incidence,
-            "reflection_deg": reflection,
-            "target_difference_deg": target_difference,
+            "spot_valid": selected["spot_valid"],
+            "spot_u_m": selected["spot_u_m"],
+            "spot_v_m": selected["spot_v_m"],
+            "spot_radial_m": selected["spot_radial_m"],
+            "ray_distance_m": selected["ray_distance_m"],
+            "incidence_deg": selected["incidence_deg"],
+            "reflection_deg": selected["reflection_deg"],
+            "target_difference_deg": selected["target_difference_deg"],
             "effective_az_error_deg": configured_az_error + drift_az,
             "effective_el_error_deg": configured_el_error + drift_el,
             "ideal_spot_u_m": scenarios["Ideal"]["spot_u_m"],
@@ -802,7 +899,12 @@ class WebTwinState:
             "corrected_spot_u_m": scenarios["Corregido"]["spot_u_m"],
             "corrected_spot_v_m": scenarios["Corregido"]["spot_v_m"],
             "corrected_spot_radial_m": scenarios["Corregido"]["spot_radial_m"],
-            "error_target": scenarios["Con error"]["target"],
+            "error_target": error_target,
+            "operational": adapted.ideal_step.operational,
+            "physical_reason": adapted.ideal_step.reason,
+            "target_limit_labels": (
+                control_targets.limit_labels if control_targets is not None else ()
+            ),
         }
 
     def step(self, wall_dt_s: float) -> None:
@@ -858,6 +960,7 @@ class WebTwinState:
                 self.el_target_deg,
                 self.el_deg_per_second * clamp(self.el_pwm, 0.0, 1.0) * wall_dt_s,
             )
+        self._sync_current_limit_state()
         self._update_correction(solar_elapsed_s)
         self.iterations += 1
         self._sample_accumulator_s += wall_dt_s
@@ -866,6 +969,42 @@ class WebTwinState:
             self.history.append(self.snapshot())
             if len(self.history) > max(2, min(int(self.history_limit), 20000)):
                 del self.history[:-self.history_limit]
+
+    @staticmethod
+    def _limit_message(labels: tuple[str, ...]) -> str:
+        """Traduce las etiquetas estables del núcleo a una señal visible breve."""
+
+        descriptions = {
+            "limite_acimut_este": "ACIMUT ESTE",
+            "limite_acimut_oeste": "ACIMUT OESTE",
+            "limite_altura_minimo": "ALTURA MINIMA",
+            "limite_altura_home": "ALTURA HOME",
+        }
+        return "LIMITE ALCANZADO: " + " / ".join(
+            descriptions.get(label, label.upper()) for label in labels
+        )
+
+    def _sync_current_limit_state(self) -> None:
+        """Registra una sola vez la llegada o salida de una frontera mecánica."""
+
+        limited = apply_mechanical_limits(
+            AxisCommands(self.az_angle_deg, self.el_angle_deg),
+            MechanicalLimits(
+                self.az_limit_min,
+                self.az_limit_max,
+                self.el_limit_min,
+                self.el_limit_max,
+            ),
+        )
+        labels = limited.limit_labels
+        self._active_limit_labels = labels
+        if labels == self._last_limit_event_labels:
+            return
+        if labels:
+            self.add_event("Limite mecanico", self._limit_message(labels))
+        elif self._last_limit_event_labels:
+            self.add_event("Limite mecanico", "Ejes nuevamente dentro del recorrido")
+        self._last_limit_event_labels = labels
 
     def status(self, snapshot: dict[str, object] | None = None) -> tuple[str, str]:
         sample = snapshot or self.snapshot()
@@ -877,6 +1016,8 @@ class WebTwinState:
             return "SIMULACION PAUSADA", "paused"
         if float(sample["altitude_deg"]) <= 0.0:
             return "SOL BAJO HORIZONTE", "alert"
+        if self._active_limit_labels:
+            return self._limit_message(self._active_limit_labels), "alert"
         if not bool(sample["spot_valid"]):
             return "SIN IMPACTO FRONTAL", "alert"
         if float(sample["spot_radial_mm"]) <= self.target_tolerance_m * 1000.0:
@@ -1069,6 +1210,23 @@ class WebTwinState:
         }
         result["status"], result["status_kind"] = self.status(result)
         return result
+
+    def scene_payload(self) -> dict[str, object]:
+        """Añade la base 3D completa sin modificar las columnas del historial."""
+
+        sample = self.snapshot()
+        if self.replay_active or self._scene_pose is None:
+            pose = mirror_pose_from_altaz(
+                float(sample["az_deg"]),
+                float(sample["el_deg"]) - self.peralte_deg,
+            )
+        else:
+            pose = self._scene_pose
+        payload = dict(sample)
+        payload["mirror_horizontal_edge"] = pose.horizontal_edge
+        payload["mirror_upper_direction"] = pose.upper_direction
+        payload["mechanical_limit_labels"] = self._active_limit_labels
+        return payload
 
     def solar_path(self, step_minutes: int = 10) -> list[tuple[float, float]]:
         when = self.active_datetime()
@@ -1293,7 +1451,7 @@ class WebTwinState:
             archive.writestr("eventos.csv", self.export_events_csv_text())
             archive.writestr(
                 "LEEME.txt",
-                "Gemelo digital web 0.4.0\n"
+                f"Gemelo digital web {WEB_APP_VERSION}\n"
                 "historial.csv: serie temporal y configuracion completa.\n"
                 "facetas.csv: una fila por faceta con geometria, normal e impacto.\n"
                 "eventos.csv: bitacora operativa de la sesion.\n",

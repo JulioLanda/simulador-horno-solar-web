@@ -1,0 +1,3 @@
+# La rueda se publica como un recurso estático del mismo sitio. El postproceso
+# resuelve esta URI contra la dirección del worker; no se consulta PyPI.
+site:../assets/pvlib-0.15.2-py3-none-any.whl

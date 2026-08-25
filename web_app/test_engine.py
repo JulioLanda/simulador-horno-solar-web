@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import datetime as dt
+import csv
 import io
 import math
 import unittest
 import zipfile
 
-from web_app.engine import WebTwinState, solar_position_db
+from web_app.engine import (
+    MINIHORNO_WEB_PROFILE,
+    WEB_APP_VERSION,
+    WebTwinState,
+    solar_position_db,
+)
+from web_app.physics_core import solar_position
 
 
 class WebTwinEngineTests(unittest.TestCase):
@@ -23,6 +30,24 @@ class WebTwinEngineTests(unittest.TestCase):
         self.assertGreater(altitude, 60.0)
         self.assertLess(zenith, 30.0)
         self.assertTrue(-180.0 <= azimuth <= 180.0)
+
+    def test_historical_solar_api_delegates_to_exact_core(self) -> None:
+        when = dt.datetime(2026, 8, 6, 12, 0, 0)
+        actual = solar_position_db(when, 18.85, -99.233333, -6.0, "REDA")
+        expected = solar_position(
+            when,
+            18.85,
+            -99.233333,
+            -6.0,
+            method="reda",
+            altitude_m=1280.0,
+            pressure_pa=101325.0,
+            temperature_c=25.0,
+        )
+        self.assertEqual(
+            actual,
+            (expected.zenith_deg, expected.altitude_deg, expected.azimuth_deg),
+        )
 
     def test_ideal_normal_centers_the_reflected_ray(self) -> None:
         state = WebTwinState(time_mode="Fecha simulada")
@@ -52,6 +77,44 @@ class WebTwinEngineTests(unittest.TestCase):
         self.assertLess(state.az_angle_deg, 40.0)
         self.assertGreater(state.el_angle_deg, 25.0)
         self.assertLess(state.el_angle_deg, 26.0)
+
+    def test_motor_axes_move_independently(self) -> None:
+        state = WebTwinState(
+            mode="Manual",
+            running=True,
+            session_started=True,
+            time_mode="Fecha simulada",
+            az_angle_deg=0.0,
+            el_angle_deg=50.0,
+            az_target_deg=30.0,
+            el_target_deg=70.0,
+            az_motor_on=False,
+            el_motor_on=True,
+        )
+        state.step(0.2)
+        self.assertEqual(state.az_angle_deg, 0.0)
+        self.assertGreater(state.el_angle_deg, 50.0)
+
+    def test_confirmed_limits_stop_and_emit_visible_label(self) -> None:
+        self.assertEqual(MINIHORNO_WEB_PROFILE["az_limit_min"], -90.0)
+        self.assertEqual(MINIHORNO_WEB_PROFILE["az_limit_max"], 90.0)
+        self.assertEqual(MINIHORNO_WEB_PROFILE["el_limit_min"], 10.0)
+        self.assertEqual(MINIHORNO_WEB_PROFILE["el_limit_max"], 90.0)
+        state = WebTwinState(
+            mode="Manual",
+            running=True,
+            session_started=True,
+            time_mode="Fecha simulada",
+            az_angle_deg=89.9,
+            az_target_deg=90.0,
+            el_angle_deg=45.0,
+            el_target_deg=45.0,
+        )
+        state.step(0.2)
+        self.assertEqual(state.az_angle_deg, 90.0)
+        sample = state.snapshot()
+        self.assertEqual(sample["status"], "LIMITE ALCANZADO: ACIMUT OESTE")
+        self.assertTrue(any("ACIMUT OESTE" in item["message"] for item in state.events))
 
     def test_automatic_mode_moves_from_current_pose_without_jump(self) -> None:
         state = WebTwinState(
@@ -84,6 +147,21 @@ class WebTwinEngineTests(unittest.TestCase):
         self.assertIn("timestamp", csv_text)
         self.assertIn("spot_radial_mm", csv_text)
         self.assertNotIn(str(math.nan), csv_text.lower())
+
+    def test_scene_pose_adds_orientation_without_changing_csv_contract(self) -> None:
+        state = WebTwinState(
+            time_mode="Fecha simulada",
+            az_angle_deg=-30.0,
+            el_angle_deg=42.0,
+        )
+        snapshot = state.snapshot()
+        payload = state.scene_payload()
+        csv_header = next(csv.reader(io.StringIO(state.export_csv_text())))
+        self.assertEqual(len(csv_header), 166)
+        self.assertNotIn("mirror_horizontal_edge", snapshot)
+        self.assertIn("mirror_horizontal_edge", payload)
+        self.assertIn("mirror_upper_direction", payload)
+        self.assertAlmostEqual(payload["mirror_horizontal_edge"][2], 0.0, places=12)
 
     def test_manual_target_changes_without_moving_instantly(self) -> None:
         state = WebTwinState(mode="Manual", az_angle_deg=10.0, az_target_deg=10.0)
@@ -191,6 +269,12 @@ class WebTwinEngineTests(unittest.TestCase):
                 {"historial.csv", "facetas.csv", "eventos.csv", "LEEME.txt"},
             )
             self.assertIn("facet_id", archive.read("facetas.csv").decode("utf-8"))
+            readme = archive.read("LEEME.txt").decode("utf-8")
+            self.assertIn(f"Gemelo digital web {WEB_APP_VERSION}", readme)
+
+    def test_release_version_is_consistent_in_snapshot(self) -> None:
+        self.assertEqual(WEB_APP_VERSION, "0.5.0")
+        self.assertEqual(WebTwinState().snapshot()["simulator_version"], WEB_APP_VERSION)
 
 
 if __name__ == "__main__":

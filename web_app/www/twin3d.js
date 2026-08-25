@@ -1,5 +1,7 @@
-import * as THREE from "https://esm.sh/three@0.180.0";
-import { OrbitControls } from "https://esm.sh/three@0.180.0/examples/jsm/controls/OrbitControls.js";
+// Three.js se distribuye junto con la aplicacion para que la escena 3D no
+// dependa de una CDN ni descargue codigo desde un dominio externo.
+import * as THREE from "./vendor/three/three.module.min.js";
+import { OrbitControls } from "./vendor/three/OrbitControls.js";
 
 const COLORS = {
   background: 0x0b1620,
@@ -90,39 +92,55 @@ function facetGeometry(shape, size) {
   return new THREE.PlaneGeometry(size, size);
 }
 
+function mirrorQuaternion(state, fallbackNormal) {
+  const edgeValues = state.mirror_horizontal_edge;
+  const upperValues = state.mirror_upper_direction;
+  if (!Array.isArray(edgeValues) || !Array.isArray(upperValues)) {
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), fallbackNormal);
+  }
+  const edgeAxis = simVector(edgeValues).normalize();
+  const upperAxis = simVector(upperValues).normalize();
+  const normalAxis = fallbackNormal.clone().normalize();
+  const basis = new THREE.Matrix4().makeBasis(edgeAxis, upperAxis, normalAxis);
+  return new THREE.Quaternion().setFromRotationMatrix(basis);
+}
+
 function addHeliostat(group, state) {
   const mirrorSize = Math.max(0.05, Number(state.mirror_size_m));
   const baseWidth = Math.max(0.10, Number(state.base_width_m));
   const forkHeight = Math.max(0.10, Number(state.fork_height_m));
   const groundY = -forkHeight;
   const normal = simVector(state.normal).normalize();
+  const mirrorRotation = mirrorQuaternion(state, normal);
+  const edgeAxis = Array.isArray(state.mirror_horizontal_edge)
+    ? simVector(state.mirror_horizontal_edge).normalize()
+    : new THREE.Vector3(1, 0, 0).applyQuaternion(mirrorRotation);
+  const upperAxis = Array.isArray(state.mirror_upper_direction)
+    ? simVector(state.mirror_upper_direction).normalize()
+    : new THREE.Vector3(0, 1, 0).applyQuaternion(mirrorRotation);
 
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(baseWidth, 0.08, baseWidth * 0.72),
-    material(COLORS.steelDark, { metalness: 0.45 }),
-  );
-  base.position.set(0, groundY, 0);
-  group.add(base);
-
-  const feet = [
-    new THREE.Vector3(-baseWidth * 0.43, groundY, -baseWidth * 0.27),
-    new THREE.Vector3(baseWidth * 0.43, groundY, -baseWidth * 0.27),
-    new THREE.Vector3(0, groundY, baseWidth * 0.32),
-  ];
-  for (const foot of feet) {
-    group.add(cylinderBetween(foot, new THREE.Vector3(foot.x * 0.22, -0.14, foot.z * 0.22), 0.035, COLORS.steel));
-  }
-  group.add(cylinderBetween(new THREE.Vector3(0, groundY, 0), new THREE.Vector3(0, -0.06, 0), 0.055, COLORS.steel));
-
-  const forkSpread = mirrorSize * 0.58;
-  group.add(cylinderBetween(new THREE.Vector3(-forkSpread, -0.18, 0), new THREE.Vector3(-forkSpread, 0.24, 0), 0.035, COLORS.steel));
-  group.add(cylinderBetween(new THREE.Vector3(forkSpread, -0.18, 0), new THREE.Vector3(forkSpread, 0.24, 0), 0.035, COLORS.steel));
+  // La base física se representa con un único tubo central. El collar vertical
+  // muestra el eje de acimut y el travesaño, que gira con él, muestra el eje de
+  // altura. No se añaden patas ni horquillas decorativas.
+  const tubeRadius = Math.max(0.045, Math.min(baseWidth, mirrorSize) * 0.045);
+  group.add(cylinderBetween(
+    new THREE.Vector3(0, groundY, 0),
+    new THREE.Vector3(0, -0.04, 0),
+    tubeRadius,
+    COLORS.steelDark,
+  ));
+  group.add(cylinderBetween(
+    edgeAxis.clone().multiplyScalar(-mirrorSize * 0.56),
+    edgeAxis.clone().multiplyScalar(mirrorSize * 0.56),
+    Math.max(0.028, tubeRadius * 0.56),
+    COLORS.steel,
+  ));
 
   const mirror = new THREE.Mesh(
     new THREE.BoxGeometry(mirrorSize, mirrorSize, Math.max(0.025, mirrorSize * 0.018)),
     material(COLORS.mirror, { metalness: 0.28, roughness: 0.28 }),
   );
-  mirror.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  mirror.quaternion.copy(mirrorRotation);
   mirror.renderOrder = 2;
   group.add(mirror);
 
@@ -130,9 +148,19 @@ function addHeliostat(group, state) {
     new THREE.EdgesGeometry(mirror.geometry),
     new THREE.LineBasicMaterial({ color: COLORS.mirrorEdge }),
   );
-  edge.quaternion.copy(mirror.quaternion);
+  edge.quaternion.copy(mirrorRotation);
   edge.renderOrder = 3;
   group.add(edge);
+
+  // Resaltar la arista inferior permite verificar visualmente que siempre es
+  // paralela al plano del suelo, independientemente de ambos motores.
+  const lowerCenter = upperAxis.clone().multiplyScalar(-mirrorSize * 0.5);
+  group.add(lineBetween(
+    lowerCenter.clone().add(edgeAxis.clone().multiplyScalar(-mirrorSize * 0.5)),
+    lowerCenter.clone().add(edgeAxis.clone().multiplyScalar(mirrorSize * 0.5)),
+    COLORS.receiver,
+    2,
+  ));
 }
 
 function addReceiver(group, state) {
@@ -215,7 +243,8 @@ function addVectors(group, state) {
   const origin = new THREE.Vector3(0, 0, 0);
   const sun = simVector(state.sun).normalize();
   const normal = simVector(state.normal).normalize();
-  const reflected = simVector(state.reflected).normalize();
+  const reflectedRaw = simVector(state.reflected);
+  const reflected = reflectedRaw.lengthSq() > 1e-12 ? reflectedRaw.normalize() : null;
   const target = simVector(state.target);
   const incomingStart = origin.clone().add(sun.clone().multiplyScalar(3.2));
 
@@ -226,8 +255,14 @@ function addVectors(group, state) {
   if (state.show_normal_vector !== false) {
     group.add(arrow(origin, normal, 1.35, COLORS.normal, 0.22));
   }
-  if (state.show_reflected_vector !== false) {
-    group.add(arrow(origin, reflected, Math.min(2.2, Math.max(1.1, target.length() * 0.30)), COLORS.ray, 0.20));
+  if (state.show_reflected_vector !== false && reflected) {
+    const reportedDistance = Number(state.ray_distance_m);
+    const rayLength = Number.isFinite(reportedDistance) && reportedDistance > 0
+      ? reportedDistance
+      : target.length();
+    const endpoint = origin.clone().add(reflected.clone().multiplyScalar(rayLength));
+    group.add(lineBetween(origin, endpoint, COLORS.ray, 2));
+    group.add(arrow(origin, reflected, rayLength, COLORS.ray, Math.min(0.24, rayLength * 0.08)));
   }
   if (state.show_target_direction !== false && target.lengthSq() > 1e-8) {
     group.add(arrow(origin, target.clone().normalize(), 1.45, COLORS.target, 0.18));
@@ -248,8 +283,8 @@ function addMechanicalGuides(group, state, groundY) {
   if (state.show_mechanical_guides !== true) return;
   const material = new THREE.LineDashedMaterial({ color: 0x8ab4f8, dashSize: 0.09, gapSize: 0.06, transparent: true, opacity: 0.75 });
   const azPoints = [];
-  const azMin = Number(state.az_limit_min_deg ?? -95);
-  const azMax = Number(state.az_limit_max_deg ?? 95);
+  const azMin = Number(state.az_limit_min_deg ?? -90);
+  const azMax = Number(state.az_limit_max_deg ?? 90);
   for (let index = 0; index <= 56; index += 1) {
     const angle = THREE.MathUtils.degToRad(azMin + (azMax - azMin) * index / 56);
     azPoints.push(new THREE.Vector3(1.35 * Math.sin(angle), groundY + 0.055, -1.35 * Math.cos(angle)));
@@ -259,7 +294,7 @@ function addMechanicalGuides(group, state, groundY) {
   group.add(azLine);
 
   const elPoints = [];
-  const elMin = Number(state.el_limit_min_deg ?? 0);
+  const elMin = Number(state.el_limit_min_deg ?? 10);
   const elMax = Number(state.el_limit_max_deg ?? 90);
   for (let index = 0; index <= 40; index += 1) {
     const angle = THREE.MathUtils.degToRad(elMin + (elMax - elMin) * index / 40);

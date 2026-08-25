@@ -30,20 +30,26 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Probar núcleo web
-        run: uv run --project web_app python -m unittest web_app.test_engine
-
-      - name: Preparar aplicación Shinylive
-        shell: bash
-        run: |
-          mkdir -p build/digital_twin build/www
-          cp web_app/app.py web_app/engine.py build/
-          cp web_app/www/* build/www/
-          cp digital_twin/*.py build/digital_twin/
+        run: >-
+          uv run --project web_app python -m unittest
+          web_app.test_engine
+          web_app.test_physics_core
+          web_app.test_physics_pipeline
+          web_app.test_physics_adapter
+          web_app.test_three_vendor
+          web_app.test_shinylive_smoke
+          web_app.test_export_shinylive_smoke
+          web_app.test_export_shinylive_app
 
       - name: Exportar sitio estático
-        run: |
-          uv run --project web_app shinylive export build _site
-          uv run --project web_app python web_app/postprocess_export.py _site "$GITHUB_SHA"
+        run: >-
+          uv run --project web_app python web_app/export_shinylive_app.py
+          --version "$GITHUB_SHA"
+
+      - name: Probar sitio en Chrome
+        run: >-
+          uv run --project web_app --group dev python web_app/e2e_browser.py
+          --site _site
 
       - name: Subir sitio para GitHub Pages
         uses: actions/upload-pages-artifact@v3

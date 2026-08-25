@@ -6,14 +6,22 @@ import datetime as dt
 import html
 import json
 import math
+import sys
 from pathlib import Path
 
 from shiny import App, reactive, render, ui
 
+if sys.platform == "emscripten":
+    try:
+        from .shinylive_runtime_packages import preload_scientific_runtime
+    except ImportError:
+        from shinylive_runtime_packages import preload_scientific_runtime
+    preload_scientific_runtime()
+
 try:
-    from .engine import MINIHORNO_WEB_PROFILE, WebTwinState
+    from .engine import MINIHORNO_WEB_PROFILE, WEB_APP_VERSION, WebTwinState
 except ImportError:
-    from engine import MINIHORNO_WEB_PROFILE, WebTwinState
+    from engine import MINIHORNO_WEB_PROFILE, WEB_APP_VERSION, WebTwinState
 
 
 APP_DIR = Path(__file__).parent
@@ -1002,7 +1010,7 @@ def about_panel() -> object:
             class_="about-flow-block",
         ),
         ui.div(
-            ui.strong("Versión web 0.4.0"),
+            ui.strong(f"Versión web {WEB_APP_VERSION}"),
             ui.span("Guía ilustrada, manual completo y referencia matemática integrados."),
             class_="version-card",
         ),
@@ -1636,7 +1644,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div(
             ui.div("GEMELO DIGITAL", class_="eyebrow"),
-            ui.h1("Mini horno solar · Web 0.4.0"),
+            ui.h1(f"Mini horno solar · Web {WEB_APP_VERSION}"),
             ui.p("Gemelo tridimensional y simulacion local en el navegador"),
             class_="brand-block",
         ),
@@ -1731,7 +1739,12 @@ app_ui = ui.page_fluid(
                     ui.input_numeric("rz", "RZ [m]", value=MINIHORNO_WEB_PROFILE["rz"], step=0.01),
                     class_="three-columns",
                 ),
-                ui.input_select("method", "Metodo solar", choices=("D&B", "REDA"), selected="D&B"),
+                ui.input_select(
+                    "method",
+                    "Metodo solar",
+                    choices=("D&B", "REDA", "SPA/PVLIB"),
+                    selected="D&B",
+                ),
                 ui.h4("Heliostato"),
                 ui.div(
                     ui.input_numeric("mirror_size", "Espejo lado [m]", value=MINIHORNO_WEB_PROFILE["mirror_size_m"], min=0.05, step=0.05),
@@ -2353,7 +2366,7 @@ def server(input, output, session) -> None:  # type: ignore[no-untyped-def]
     @render.ui
     def scene_state() -> object:
         current_revision = revision.get()
-        sample = state.snapshot()
+        sample = state.scene_payload()
         sample["revision"] = current_revision
         analysis = state.facet_analysis()
         sample["facets"] = [
